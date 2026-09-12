@@ -1,22 +1,13 @@
-"""
-app.py - Sistema Web para Estudo das Escrituras da Escola Dominical (Ala Periperi)
-Desenvolvido em Python com Streamlit, SQLite e Google Gemini AI.
-"""
-
-import os
-import json
-import glob
-from pathlib import Path
-from datetime import datetime
 import streamlit as st
-import pandas as pd
+import sqlite3
+import json
+import os
+from datetime import datetime
 from PIL import Image
 
-import database
-
-# ==========================================
-# CONFIGURAÇÃO DA PÁGINA
-# ==========================================
+# =======================================================
+# 1. CONFIGURAÇÃO DE PÁGINA
+# =======================================================
 st.set_page_config(
     page_title="Escola Dominical — Ala Periperi",
     page_icon="📖",
@@ -24,916 +15,567 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Inicializa banco de dados e questões sementes se necessário
-database.init_db()
-
-# ==========================================
-# ESTILIZAÇÃO VISUAL CUSTOMIZADA (CSS)
-# ==========================================
+# =======================================================
+# 2. DESIGN VISUAL E CSS REFINADO (A IGREJA DE JESUS CRISTO)
+# =======================================================
 st.markdown("""
-<style>
-    /* Variáveis e paleta com tons serenos de azul e dourado/areia */
-    :root {
-        --cor-primaria: #1a365d;
-        --cor-secundaria: #2b6cb0;
-        --cor-azul-claro: #ebf8ff;
-        --cor-dourado: #d69e2e;
-        --cor-dourado-claro: #fefcbf;
-        --cor-areia: #fbf7ee;
-        --cor-cinza-borda: #e2e8f0;
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #1e293b;
     }
 
-    /* Otimizações globais de layout */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 3rem;
-        max-width: 1200px;
+    .stApp {
+        background-color: #f8fafc;
     }
 
-    /* Banner Superior Acolhedor */
-    .periperi-banner {
-        background: linear-gradient(135deg, #1a365d 0%, #2b6cb0 65%, #2c5282 100%);
+    /* Cabeçalho Hero Institucional */
+    .church-header {
+        background: linear-gradient(135deg, #0b2545 0%, #133b68 60%, #1d4e89 100%);
+        border-bottom: 3px solid #c5a059;
         color: #ffffff;
-        padding: 2.2rem 2.4rem;
-        border-radius: 16px;
-        margin-bottom: 2rem;
-        box-shadow: 0 10px 25px -5px rgba(26, 54, 93, 0.25);
-        border-bottom: 4px solid #d69e2e;
-        position: relative;
-    }
-
-    .periperi-banner h1 {
-        font-size: 2.4rem;
-        font-weight: 800;
-        margin: 0;
-        color: #ffffff !important;
-        letter-spacing: -0.5px;
-    }
-
-    .periperi-banner p.subtitulo {
-        font-size: 1.25rem;
-        color: #feebc8;
-        margin-top: 0.6rem;
-        margin-bottom: 0;
-        font-style: italic;
-        font-weight: 400;
-    }
-
-    .periperi-banner p.lema {
-        font-size: 0.95rem;
-        color: #e2e8f0;
-        margin-top: 0.4rem;
-        margin-bottom: 0;
-        opacity: 0.9;
-    }
-
-    /* Cartão de Boas-Vindas e Aviso Amigável para Fotos */
-    .empty-assets-card {
-        background-color: #fbf7ee;
-        border: 2px dashed #d69e2e;
+        padding: 32px 30px;
         border-radius: 14px;
-        padding: 1.8rem;
+        margin-bottom: 25px;
+        box-shadow: 0 10px 25px -5px rgba(11, 37, 69, 0.25);
         text-align: center;
-        margin-bottom: 2rem;
     }
-
-    .empty-assets-card h3 {
-        color: #1a365d;
-        margin-top: 0;
-        font-size: 1.3rem;
+    .church-header .sub-sub {
+        text-transform: uppercase;
+        letter-spacing: 2.5px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #e2c275;
+        margin-bottom: 8px;
+    }
+    .church-header h1 {
+        font-family: 'Cinzel', serif;
+        font-size: 32px;
         font-weight: 700;
+        letter-spacing: 0.5px;
+        margin: 0;
+        color: #ffffff;
     }
-
-    .empty-assets-card p {
-        color: #4a5568;
-        font-size: 1rem;
-        margin-bottom: 0;
-    }
-
-    /* Cartões da Galeria de Fotos */
-    .photo-card {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.06);
-        transition: transform 0.2s ease;
-        margin-bottom: 1rem;
-    }
-
-    .photo-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    .church-header p {
+        font-size: 15px;
+        color: #e2e8f0;
+        margin-top: 10px;
+        font-style: italic;
     }
 
     /* Cartões de Questão */
     .quiz-card {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
-        border-left: 6px solid #2b6cb0;
+        border-left: 5px solid #133b68;
         border-radius: 12px;
-        padding: 1.5rem 1.8rem;
-        margin-bottom: 1.8rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        padding: 22px 24px;
+        margin-bottom: 18px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
     }
-
-    .quiz-card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.8rem;
-    }
-
-    .badge-tema {
-        background-color: #ebf8ff;
-        color: #2b6cb0;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.85rem;
+    .quiz-title {
         font-weight: 700;
-        display: inline-block;
-        border: 1px solid #bee3f8;
+        color: #0b2545;
+        font-size: 16px;
+        margin-bottom: 8px;
     }
 
-    .badge-capitulo {
-        background-color: #fefcbf;
-        color: #975a16;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.85rem;
-        font-weight: 700;
-        display: inline-block;
-        border: 1px solid #faf089;
-        margin-left: 0.5rem;
+    /* Alternativas de Resposta (stRadio) */
+    div[data-testid="stRadio"] > div {
+        gap: 10px;
+    }
+    div[data-testid="stRadio"] label {
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        padding: 12px 18px !important;
+        border-radius: 10px !important;
+        transition: all 0.2s ease !important;
+        cursor: pointer;
+        width: 100%;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    }
+    div[data-testid="stRadio"] label:hover {
+        background: #f1f5f9 !important;
+        border-color: #133b68 !important;
+        transform: translateX(4px);
     }
 
-    .enunciado-text {
-        font-size: 1.15rem;
-        font-weight: 600;
-        color: #1a202c;
-        line-height: 1.5;
-        margin-bottom: 1.2rem;
+    /* Botão Principal */
+    .stButton > button {
+        background: linear-gradient(135deg, #0b2545 0%, #133b68 100%) !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        font-size: 16px !important;
+        letter-spacing: 0.3px !important;
+        border-radius: 10px !important;
+        padding: 0.75rem 2rem !important;
+        border: 1px solid #c5a059 !important;
+        box-shadow: 0 4px 14px rgba(11, 37, 69, 0.2) !important;
+        transition: all 0.2s ease !important;
+    }
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #133b68 0%, #1d4e89 100%) !important;
+        box-shadow: 0 6px 20px rgba(11, 37, 69, 0.3) !important;
+        color: #e2c275 !important;
+        transform: translateY(-1px);
     }
 
-    /* Cartões de Resultado do Quiz */
-    .result-box-correct {
-        background-color: #f0fff4;
-        border: 1px solid #9ae6b4;
-        border-left: 6px solid #38a169;
-        border-radius: 10px;
-        padding: 1.2rem;
-        margin-top: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .result-box-incorrect {
-        background-color: #fff5f5;
-        border: 1px solid #feb2b2;
-        border-left: 6px solid #e53e3e;
-        border-radius: 10px;
-        padding: 1.2rem;
-        margin-top: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    /* Pódio do Quadro de Destaque */
-    .podium-box {
-        border-radius: 14px;
-        padding: 1.6rem 1.2rem;
-        text-align: center;
-        box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.08);
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-    }
-
-    .podium-gold {
-        background: linear-gradient(180deg, #fffaf0 0%, #ffffff 100%);
-        border: 2px solid #d69e2e;
-    }
-
-    .podium-silver {
-        background: linear-gradient(180deg, #f7fafc 0%, #ffffff 100%);
-        border: 2px solid #a0aec0;
-    }
-
-    .podium-bronze {
-        background: linear-gradient(180deg, #fffaf0 0%, #ffffff 100%);
-        border: 2px solid #dd6b20;
-    }
-
-    .podium-medal {
-        font-size: 2.8rem;
-        line-height: 1;
-        margin-bottom: 0.5rem;
-    }
-
-    .podium-name {
-        font-size: 1.25rem;
-        font-weight: 800;
-        color: #1a365d;
-        margin-bottom: 0.3rem;
-    }
-
-    .podium-score {
-        font-size: 1.6rem;
-        font-weight: 900;
-        color: #2b6cb0;
-    }
-
-    .podium-tema {
-        font-size: 0.85rem;
-        color: #718096;
-        margin-top: 0.3rem;
-    }
-
-    /* Cartão de Estatística */
-    .metric-card {
+    /* Cartões de Métricas */
+    [data-testid="stMetric"] {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
+        border-top: 3px solid #c5a059;
+        padding: 18px;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+    }
+
+    /* Pódio do Ranking */
+    .podio-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
         border-radius: 12px;
-        padding: 1.2rem;
+        padding: 20px;
         text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.04);
     }
-
-    /* Abas estilizadas */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 12px;
-        border-bottom: 2px solid #e2e8f0;
-        padding-bottom: 4px;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        height: 48px;
-        white-space: pre-wrap;
-        background-color: #f7fafc;
-        border-radius: 8px 8px 0 0;
-        padding: 10px 20px;
-        font-weight: 600;
-        color: #4a5568;
-    }
-
-    .stTabs [aria-selected="true"] {
-        background-color: #ebf8ff !important;
-        color: #1a365d !important;
-        border-bottom: 3px solid #2b6cb0 !important;
-    }
-</style>
+    .podio-pos { font-size: 32px; margin-bottom: 6px; }
+    .podio-nome { font-weight: 700; font-size: 17px; color: #0b2545; }
+    .podio-media { font-size: 22px; font-weight: 700; color: #133b68; margin-top: 4px; }
+    </style>
 """, unsafe_allow_html=True)
 
+# =======================================================
+# 3. BANCO DE DADOS (SQLite Local)
+# =======================================================
+DB_FILE = "escola_dominical_periperi.db"
 
-# ==========================================
-# COMPONENTE: BANNER & GALERIA DE FOTOS
-# ==========================================
-def render_header_e_galeria():
-    """Renderiza o banner principal acolhedor e a galeria de fotos da pasta assets/."""
-    # Banner Principal
-    st.markdown("""
-    <div class="periperi-banner">
-        <h1>📖 Escola Dominical — Ala Periperi</h1>
-        <p class="subtitulo">"Venham e Aprendam Comigo" (Mateus 11:28-30)</p>
-        <p class="lema">Fortalecendo a fé através do estudo diário e conjunto das escrituras sagradas.</p>
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS questoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            livro_tema TEXT,
+            capitulo_licao TEXT,
+            enunciado TEXT,
+            opcoes_json TEXT,
+            correta TEXT,
+            explicacao_referencia TEXT
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS ranking (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome_aluno TEXT,
+            tema TEXT,
+            acertos INTEGER,
+            total INTEGER,
+            porcentagem REAL,
+            data_hora TEXT
+        )
+    ''')
+
+    c.execute("SELECT COUNT(*) FROM questoes")
+    if c.fetchone()[0] == 0:
+        questoes_iniciais = [
+            (
+                "Livro de Mórmon",
+                "1 Néfi 3",
+                "Qual foi a memorável resposta dada por Néfi quando seu pai, Leí, pediu para que ele retornasse a Jerusalém para buscar as placas de latão?",
+                json.dumps({
+                    "A": "Irei e farei as coisas que o Senhor ordenou, pois sei que Ele nunca dá ordens sem preparar um caminho.",
+                    "B": "Pedirei um sinal ao Senhor para saber se essa jornada é verdadeiramente necessária.",
+                    "C": "Iremos somente se nossos irmãos Lamã e Lemuel concordarem em liderar o caminho.",
+                    "D": "Esperaremos até que as tribulações no deserto diminuam antes de regressarmos."
+                }),
+                "A",
+                "1 Néfi 3:7 — “Eu irei e farei as coisas que o Senhor ordenou, porque sei que o Senhor nunca dá ordens aos filhos dos homens sem antes preparar um caminho para que possam cumprir o que lhes ordena.”"
+            ),
+            (
+                "Livro de Mórmon",
+                "Mosias 2",
+                "Ao discursar de sua torre para o povo, o que o Rei Benjamim ensinou a respeito do serviço ao próximo?",
+                json.dumps({
+                    "A": "Quem serve ao próximo adquire méritos para ser exaltado sem esforço pessoal.",
+                    "B": "Quando estais a serviço de vosso próximo, estais somente a serviço de vosso Deus.",
+                    "C": "O serviço é exigido apenas daqueles que possuem abundância de bens materiais.",
+                    "D": "Devemos servir unicamente aos que compartilham das nossas mesmas crenças."
+                }),
+                "B",
+                "Mosias 2:17 — “E eis que vos digo estas coisas para que aprendais sabedoria; para que saibais que, quando estais a serviço de vosso próximo, estais somente a serviço de vosso Deus.”"
+            ),
+            (
+                "Doutrina e Convênios",
+                "Seção 19",
+                "O que o Senhor nos ensina sobre o discipulado e a paz pessoal em Doutrina e Convênios 19:23?",
+                json.dumps({
+                    "A": "Buscai primeiro as riquezas do mundo para depois edificar a Sião.",
+                    "B": "Aprendei de mim e ouvi minhas palavras; andai na mansidão de meu Espírito e tereis paz em mim.",
+                    "C": "Não façais orações em segredo, mas proclamai vosso conhecimento publicamente.",
+                    "D": "O conhecimento secular precede os mandamentos espirituais."
+                }),
+                "B",
+                "D&C 19:23 — “Aprendei de mim e ouvi minhas palavras; andai na mansidão de meu Espírito e tereis paz em mim.”"
+            ),
+            (
+                "Vem, e Segue-Me",
+                "Princípios do Evangelho",
+                "De acordo com Tiago 1:5, o que devemos fazer se tivermos falta de sabedoria?",
+                json.dumps({
+                    "A": "Guardar a dúvida em segredo para não demonstrar fraqueza.",
+                    "B": "Pedir a Deus, que a todos dá liberalmente e nada censura, e ser-nos-á dada.",
+                    "C": "Aguardar anos até que surja uma resposta espontânea.",
+                    "D": "Consultar unicamente filosofias dos homens."
+                }),
+                "B",
+                "Tiago 1:5 — “E se algum de vós tem falta de sabedoria, peça-a a Deus, que a todos dá liberalmente e nada censura, e ser-lhe-á dada.” Essa passagem motivou Joseph Smith a orar no Bosque Sagrado."
+            )
+        ]
+        c.executemany('''
+            INSERT INTO questoes (livro_tema, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', questoes_iniciais)
+
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# =======================================================
+# 4. CABEÇALHO HERO INSTITUCIONAL
+# =======================================================
+st.markdown("""
+    <div class="church-header">
+        <div class="sub-sub">A Igreja de Jesus Cristo dos Santos dos Últimos Dias</div>
+        <h1>Escola Dominical — Ala Periperi</h1>
+        <p>“Aprendei de mim e ouvi minhas palavras; andai na mansidão de meu Espírito e tereis paz em mim.” — D&C 19:23</p>
     </div>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-    # Leitura da pasta assets/
-    assets_dir = Path("assets")
-    extensoes_validas = ("*.jpg", "*.jpeg", "*.png", "*.webp", "*.avif", "*.gif")
-    arquivos_fotos = []
-    if assets_dir.exists() and assets_dir.is_dir():
-        for ext in extensoes_validas:
-            arquivos_fotos.extend(assets_dir.glob(ext))
-            arquivos_fotos.extend(assets_dir.glob(ext.upper()))
-
-    # Se houver fotos na pasta
-    if arquivos_fotos:
-        with st.expander("📸 Galeria de Fotos e Momentos da Ala Periperi", expanded=True):
-            cols = st.columns(min(len(arquivos_fotos), 4))
-            for idx, foto_path in enumerate(arquivos_fotos):
-                col = cols[idx % len(cols)]
-                with col:
-                    try:
-                        img = Image.open(foto_path)
-                        nome_legenda = foto_path.stem.replace("_", " ").replace("-", " ").title()
-                        st.image(img, use_container_width=True, caption=nome_legenda)
-                    except Exception as e:
-                        st.caption(f"Erro ao carregar imagem: {foto_path.name}")
-    else:
-        # Layout receptivo e amigável quando assets/ está vazia
-        st.markdown("""
-        <div class="empty-assets-card">
-            <h3>📷 Bem-vindo à Galeria da Ala Periperi!</h3>
-            <p>
-                Ainda não há fotos adicionadas na pasta <code>assets/</code>.<br>
-                Professores e membros podem adicionar fotos das aulas da Escola Dominical, confraternizações e momentos especiais 
-                diretamente na pasta <strong>assets/</strong> ou pelo painel do professor para que elas apareçam aqui com destaque.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-
-render_header_e_galeria()
-
-
-# ==========================================
-# ABAS PRINCIPAIS DO SISTEMA
-# ==========================================
-tab_estudo, tab_destaque, tab_professor = st.tabs([
-    "📚 Estudo & Quiz",
+# Navegação do Sistema em Abas
+aba_home, aba_quiz, aba_ranking, aba_professor = st.tabs([
+    "🏠 Início & Galeria",
+    "📖 Estudo & Quiz",
     "🏆 Quadro de Destaque",
-    "🎓 Área do Professor"
+    "🔐 Área do Professor"
 ])
 
+# =======================================================
+# ABA 1: INÍCIO E GALERIA DE FOTOS
+# =======================================================
+with aba_home:
+    st.subheader("Bem-vindos à Escola Dominical da Ala Periperi")
+    st.write(
+        "Este portal foi desenvolvido para apoiar nosso estudo semanal do evangelho, "
+        "reforçar as escrituras e incentivar a preparação de cada membro para as aulas de domingo."
+    )
 
-# ==============================================================================
-# ABA 1: ESTUDO & QUIZ
-# ==============================================================================
-with tab_estudo:
-    st.subheader("📝 Questionário de Estudo das Escrituras")
-    st.caption("Responda às questões propostas para aprofundar seu conhecimento doutrinário.")
+    # Verificação e Exibição de Fotos da pasta assets/
+    pasta_assets = "assets"
+    fotos = []
+    if os.path.exists(pasta_assets):
+        fotos = [os.path.join(pasta_assets, f) for f in os.listdir(pasta_assets) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
 
-    # Filtros e Identificação do Aluno
-    col_aluno, col_tema, col_cap = st.columns([1.5, 1.2, 1.2])
-
-    with col_aluno:
-        nome_aluno = st.text_input(
-            "👤 Nome do Aluno(a):",
-            placeholder="Ex: Irmão Silva, Irmã Oliveira...",
-            key="quiz_nome_aluno",
-            help="Seu nome será registrado no Quadro de Destaque após o término."
-        )
-
-    # Opções dinâmicas de temas
-    temas_disponiveis = ["Todos"] + database.get_temas()
-    with col_tema:
-        tema_selecionado = st.selectbox("📖 Tema / Livro:", temas_disponiveis, key="filtro_tema")
-
-    # Opções dinâmicas de capítulos/lições
-    capitulos_disponiveis = ["Todas"] + database.get_capitulos(tema_selecionado)
-    with col_cap:
-        capitulo_selecionado = st.selectbox("📑 Lição / Capítulo:", capitulos_disponiveis, key="filtro_capitulo")
-
-    # Recupera questões filtradas
-    questoes = database.get_questoes(tema_selecionado, capitulo_selecionado)
-
-    if not questoes:
-        st.info("ℹ️ Nenhuma questão encontrada para os filtros selecionados. Selecione outro tema ou lição.")
+    st.divider()
+    st.markdown("### 📸 Nossa Unidade e Atividades")
+    if fotos:
+        colunas = st.columns(min(len(fotos), 3))
+        for idx, foto_path in enumerate(fotos):
+            col = colunas[idx % 3]
+            try:
+                img = Image.open(foto_path)
+                nome_arq = os.path.splitext(os.path.basename(foto_path))[0].replace("_", " ").title()
+                col.image(img, caption=nome_arq, use_container_width=True)
+            except Exception:
+                pass
     else:
-        st.markdown(f"**Total de perguntas para este estudo:** {len(questoes)}")
+        st.info("💡 **Dica:** Coloque fotos de nossa capela, da classe ou de atividades na pasta `assets/` do projeto para exibi-las aqui na página inicial.")
 
-        # Formulário do Quiz
-        with st.form("form_quiz_periperi"):
-            respostas_usuario = {}
+# =======================================================
+# ABA 2: ESTUDO & QUIZ DO ALUNO
+# =======================================================
+with aba_quiz:
+    st.subheader("Caderno de Estudos e Perguntas")
+    col1, col2 = st.columns(2)
 
-            for idx, q in enumerate(questoes, 1):
-                st.markdown(f"""
-                <div class="quiz-card">
-                    <div class="quiz-card-header">
-                        <span style="font-weight: 700; color: #1a365d; font-size: 1.1rem;">Questão #{idx}</span>
-                        <div>
-                            <span class="badge-tema">{q['livro_tema']}</span>
-                            <span class="badge-capitulo">{q['capitulo_licao']}</span>
-                        </div>
-                    </div>
-                    <div class="enunciado-text">{q['enunciado']}</div>
-                </div>
-                """, unsafe_allow_html=True)
+    with col1:
+        nome_aluno = st.text_input("Seu Nome (ou Nome Completo):", placeholder="Ex: Irmão Souza / Taís")
 
-                opcoes_formatadas = [
-                    f"A) {q['opcoes'].get('A', '')}",
-                    f"B) {q['opcoes'].get('B', '')}",
-                    f"C) {q['opcoes'].get('C', '')}",
-                    f"D) {q['opcoes'].get('D', '')}"
-                ]
+    with col2:
+        conn = sqlite3.connect(DB_FILE)
+        temas = [r[0] for r in conn.cursor().execute("SELECT DISTINCT livro_tema FROM questoes").fetchall()]
+        conn.close()
+        tema_selecionado = st.selectbox("Livro / Programa:", temas if temas else ["Nenhum tema cadastrado"])
 
-                # Radio button de resposta
-                escolha = st.radio(
-                    f"Selecione sua resposta para a Questão #{idx}:",
-                    options=opcoes_formatadas,
-                    index=None,
-                    key=f"radio_q_{q['id']}"
-                )
-                respostas_usuario[q["id"]] = escolha
+    if not nome_aluno:
+        st.info("👆 Por favor, preencha o seu nome acima para iniciar as perguntas.")
+    else:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT id, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia FROM questoes WHERE livro_tema = ?", (tema_selecionado,))
+        questoes = c.fetchall()
+        conn.close()
 
-                st.markdown("---")
-
-            submeter_quiz = st.form_submit_button("✨ Finalizar e Ver Gabarito Comentado", use_container_width=True)
-
-        # Processamento das Respostas
-        if submeter_quiz:
-            if not nome_aluno.strip():
-                st.error("⚠️ Por favor, informe seu nome acima no campo 'Nome do Aluno(a)' antes de enviar o quiz!")
-            else:
-                acertos = 0
-                total = len(questoes)
-
-                st.markdown("## 📊 Resultado e Gabarito Comentado")
-
+        if not questoes:
+            st.warning("Ainda não há perguntas cadastradas para este tema.")
+        else:
+            with st.form("form_estudo_dominical"):
+                respostas_usuario = {}
                 for idx, q in enumerate(questoes, 1):
-                    resposta_sel = respostas_usuario.get(q["id"])
-                    letra_sel = resposta_sel[0] if resposta_sel else None
-                    letra_correta = q["correta"].upper()
+                    q_id, capitulo, enunciado, opcoes_str, correta, explicacao = q
+                    opcoes = json.loads(opcoes_str)
 
-                    is_correta = (letra_sel == letra_correta)
-                    if is_correta:
-                        acertos += 1
-
-                    # Card de correção individual
-                    if is_correta:
-                        st.markdown(f"""
-                        <div class="result-box-correct">
-                            <h4 style="color: #276749; margin-top:0;">✅ Questão #{idx} — Resposta Correta!</h4>
-                            <p><strong>Sua resposta:</strong> {resposta_sel}</p>
-                            <p><strong>📖 Explicação & Referência:</strong> {q['explicacao_referencia']}</p>
+                    st.markdown(f"""
+                        <div class="quiz-card">
+                            <div class="quiz-title">📖 Pergunta {idx:02d} — {capitulo}</div>
+                            <div style="font-size: 15px; line-height: 1.6;">{enunciado}</div>
                         </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                        <div class="result-box-incorrect">
-                            <h4 style="color: #9b2c2c; margin-top:0;">❌ Questão #{idx} — Resposta Incorreta</h4>
-                            <p><strong>Sua escolha:</strong> {resposta_sel if resposta_sel else 'Nenhuma resposta selecionada'}</p>
-                            <p><strong>Gabarito Correto:</strong> Letra {letra_correta}) {q['opcoes'].get(letra_correta, '')}</p>
-                            <p><strong>📖 Explicação & Referência:</strong> {q['explicacao_referencia']}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
 
-                porcentagem = (acertos / total) * 100
+                    opcoes_formatadas = [f"{letra}) {texto}" for letra, texto in opcoes.items()]
+                    escolha = st.radio(
+                        label=f"Q_{q_id}",
+                        options=opcoes_formatadas,
+                        index=None,
+                        key=f"quiz_{q_id}",
+                        label_visibility="collapsed"
+                    )
+                    respostas_usuario[q_id] = {
+                        "escolha": escolha[0] if escolha else None,
+                        "correta": correta,
+                        "explicacao": explicacao
+                    }
+                    st.write("")
 
-                # Gravação no SQLite
-                tema_registro = tema_selecionado if tema_selecionado != "Todos" else "Estudo Geral"
-                database.save_ranking(
-                    nome_aluno=nome_aluno,
-                    tema=tema_registro,
-                    acertos=acertos,
-                    total=total,
-                    porcentagem=porcentagem
-                )
+                btn_enviar = st.form_submit_button("Concluir Estudo e Ver Resumo", use_container_width=True)
 
-                # Destaque de comemoração
-                if porcentagem >= 80:
-                    st.balloons()
-                    st.success(f"🎉 Parabéns, **{nome_aluno}**! Excelente estudo! Você acertou **{acertos} de {total}** ({porcentagem:.1f}%). Seu resultado foi salvo no Quadro de Destaque!")
-                elif porcentagem >= 50:
-                    st.info(f"👏 Muito bem, **{nome_aluno}**! Bom aproveitamento: **{acertos} de {total}** ({porcentagem:.1f}%). Continue estudando as escrituras!")
+            if btn_enviar:
+                faltando = [k for k, v in respostas_usuario.items() if v["escolha"] is None]
+                if faltando:
+                    st.error("⚠️ Você deixou perguntas em branco! Responda todas antes de finalizar.")
                 else:
-                    st.warning(f"📖 Obrigado pela dedicação, **{nome_aluno}**! Você acertou **{acertos} de {total}** ({porcentagem:.1f}%). Que tal revisar os capítulos e tentar novamente?")
+                    acertos = sum(1 for v in respostas_usuario.values() if v["escolha"] == v["correta"])
+                    total = len(questoes)
+                    porcentagem = round((acertos / total) * 100, 1)
 
+                    # Gravar no SQLite
+                    conn = sqlite3.connect(DB_FILE)
+                    c = conn.cursor()
+                    c.execute('''
+                        INSERT INTO ranking (nome_aluno, tema, acertos, total, porcentagem, data_hora)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ''', (nome_aluno.strip().title(), tema_selecionado, acertos, total, porcentagem, datetime.now().strftime("%d/%m/%Y %H:%M")))
+                    conn.commit()
+                    conn.close()
 
-# ==============================================================================
-# ABA 2: QUADRO DE DESTAQUE (RANKING)
-# ==============================================================================
-with tab_destaque:
-    st.subheader("🏆 Quadro de Destaque da Ala Periperi")
-    st.caption("Reconhecendo a dedicação e o empenho dos alunos no estudo das escrituras.")
+                    st.toast("Estudo salvo com sucesso!", icon="📖")
+                    st.divider()
+                    st.subheader("📊 Seu Desempenho")
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric("Acertos", f"{acertos} de {total}")
+                    m2.metric("Aproveitamento", f"{porcentagem}%")
+                    m3.metric("Mensagem", "Excelente estudo!" if porcentagem >= 70 else "Continue se aprofundando!")
 
-    # Filtro de tema para o ranking
-    temas_ranking = ["Todos"] + database.get_temas()
-    col_filtro_r, col_limite = st.columns([2.5, 1.5])
-    with col_filtro_r:
-        filtro_tema_rank = st.selectbox("Filtrar Ranking por Tema:", temas_ranking, key="rank_filtro_tema")
-    with col_limite:
-        limite_rank = st.selectbox("Exibir:", [10, 25, 50, 100], index=1, key="rank_limite")
+                    st.subheader("📋 Gabarito e Escrituras de Referência")
+                    for idx, q in enumerate(questoes, 1):
+                        q_id, capitulo, enunciado, _, correta, explicacao = q
+                        resp = respostas_usuario[q_id]
+                        acertou = resp["escolha"] == resp["correta"]
+                        icone = "✅" if acertou else "❌"
 
-    ranking_data = database.get_ranking(tema=filtro_tema_rank, limit=limite_rank)
-    stats = database.get_estatisticas_ranking()
+                        with st.expander(f"{icone} Pergunta {idx:02d} — Gabarito: {correta} (Sua resposta: {resp['escolha']})"):
+                            st.write(f"**Pergunta:** {enunciado}")
+                            st.info(f"**Referência & Reflexão:** {explicacao}")
 
-    # Cards de Estatísticas Globais
-    st.markdown("### 📈 Estatísticas da Classe")
-    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
-    with col_stat1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h4 style="margin:0; color:#718096; font-size:0.9rem;">TENTATIVAS</h4>
-            <span style="font-size:1.8rem; font-weight:800; color:#1a365d;">{stats['total_tentativas']}</span>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_stat2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h4 style="margin:0; color:#718096; font-size:0.9rem;">ALUNOS ÚNICOS</h4>
-            <span style="font-size:1.8rem; font-weight:800; color:#2b6cb0;">{stats['total_alunos']}</span>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_stat3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h4 style="margin:0; color:#718096; font-size:0.9rem;">MÉDIA DA ALA</h4>
-            <span style="font-size:1.8rem; font-weight:800; color:#d69e2e;">{stats['media_porcentagem']}%</span>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_stat4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <h4 style="margin:0; color:#718096; font-size:0.9rem;">MAIOR NOTA</h4>
-            <span style="font-size:1.8rem; font-weight:800; color:#38a169;">{stats['maior_porcentagem']}%</span>
-        </div>
-        """, unsafe_allow_html=True)
+# =======================================================
+# ABA 3: QUADRO DE DESTAQUE (RANKING)
+# =======================================================
+with aba_ranking:
+    st.subheader("Quadro de Participação e Destaque")
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        SELECT 
+            nome_aluno,
+            COUNT(id) as total_estudos,
+            SUM(acertos) as total_acertos,
+            ROUND(AVG(porcentagem), 1) as media_aproveitamento
+        FROM ranking
+        GROUP BY nome_aluno
+        ORDER BY media_aproveitamento DESC, total_acertos DESC
+    ''')
+    dados_ranking = c.fetchall()
+    conn.close()
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # PÓDIO COM TOP 3 (🥇, 🥈, 🥉)
-    if ranking_data:
-        st.markdown("### 🥇 Pódio de Honra (Top 3)")
-        podium_cols = st.columns(3)
-
-        # 1º Lugar
-        top1 = ranking_data[0] if len(ranking_data) > 0 else None
-        # 2º Lugar
-        top2 = ranking_data[1] if len(ranking_data) > 1 else None
-        # 3º Lugar
-        top3 = ranking_data[2] if len(ranking_data) > 2 else None
-
-        # Exibição: 2º Lugar na esquerda, 1º no centro, 3º na direita (estilo olímpico)
-        with podium_cols[0]:
-            if top2:
+    if dados_ranking:
+        st.write("")
+        col_p1, col_p2, col_p3 = st.columns(3)
+        if len(dados_ranking) >= 1:
+            with col_p1:
                 st.markdown(f"""
-                <div class="podium-box podium-silver">
-                    <div class="podium-medal">🥈</div>
-                    <div style="font-weight:700; color:#718096; font-size:0.9rem;">2º LUGAR</div>
-                    <div class="podium-name">{top2['nome_aluno']}</div>
-                    <div class="podium-score">{top2['porcentagem']}%</div>
-                    <div class="podium-tema">{top2['acertos']}/{top2['total']} acertos • {top2['tema']}</div>
-                </div>
+                    <div class="podio-card" style="border-top: 4px solid #d4af37;">
+                        <div class="podio-pos">🥇</div>
+                        <div class="podio-nome">{dados_ranking[0][0]}</div>
+                        <div class="podio-media">{dados_ranking[0][3]}%</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:4px;">1º Lugar Geral</div>
+                    </div>
                 """, unsafe_allow_html=True)
-            else:
-                st.info("Aguardando 2º colocado...")
-
-        with podium_cols[1]:
-            if top1:
+        if len(dados_ranking) >= 2:
+            with col_p2:
                 st.markdown(f"""
-                <div class="podium-box podium-gold">
-                    <div class="podium-medal">🥇</div>
-                    <div style="font-weight:700; color:#d69e2e; font-size:0.95rem;">CAMPEÃO(Ã)</div>
-                    <div class="podium-name">{top1['nome_aluno']}</div>
-                    <div class="podium-score">{top1['porcentagem']}%</div>
-                    <div class="podium-tema">{top1['acertos']}/{top1['total']} acertos • {top1['tema']}</div>
-                </div>
+                    <div class="podio-card" style="border-top: 4px solid #94a3b8;">
+                        <div class="podio-pos">🥈</div>
+                        <div class="podio-nome">{dados_ranking[1][0]}</div>
+                        <div class="podio-media">{dados_ranking[1][3]}%</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:4px;">2º Lugar Geral</div>
+                    </div>
                 """, unsafe_allow_html=True)
-            else:
-                st.info("Aguardando 1º colocado...")
-
-        with podium_cols[2]:
-            if top3:
+        if len(dados_ranking) >= 3:
+            with col_p3:
                 st.markdown(f"""
-                <div class="podium-box podium-bronze">
-                    <div class="podium-medal">🥉</div>
-                    <div style="font-weight:700; color:#dd6b20; font-size:0.9rem;">3º LUGAR</div>
-                    <div class="podium-name">{top3['nome_aluno']}</div>
-                    <div class="podium-score">{top3['porcentagem']}%</div>
-                    <div class="podium-tema">{top3['acertos']}/{top3['total']} acertos • {top3['tema']}</div>
-                </div>
+                    <div class="podio-card" style="border-top: 4px solid #b45309;">
+                        <div class="podio-pos">🥉</div>
+                        <div class="podio-nome">{dados_ranking[2][0]}</div>
+                        <div class="podio-media">{dados_ranking[2][3]}%</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:4px;">3º Lugar Geral</div>
+                    </div>
                 """, unsafe_allow_html=True)
-            else:
-                st.info("Aguardando 3º colocado...")
 
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # TABELA COMPLETA COM MÉDIAS E ACERTOS
-        st.markdown("### 📋 Classificação Completa")
-        df_ranking = pd.DataFrame(ranking_data)
-        df_ranking["Posição"] = [f"#{i+1}" for i in range(len(df_ranking))]
-        df_display = df_ranking[["Posição", "nome_aluno", "tema", "acertos", "total", "porcentagem", "data_hora"]].copy()
-        df_display.columns = ["Posição", "Aluno", "Tema / Lição", "Acertos", "Total de Questões", "Aproveitamento (%)", "Data/Hora"]
-
-        st.dataframe(
-            df_display,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Aproveitamento (%)": st.column_config.ProgressColumn(
-                    "Aproveitamento (%)",
-                    help="Percentual de acertos no quiz",
-                    format="%.1f%%",
-                    min_value=0,
-                    max_value=100,
-                ),
-            }
-        )
+        st.write("")
+        tabela = []
+        for pos, linha in enumerate(dados_ranking, 1):
+            tabela.append({
+                "Posição": f"{pos}º",
+                "Membro / Aluno": linha[0],
+                "Estudos Realizados": linha[1],
+                "Acertos Totais": linha[2],
+                "Média de Acertos": f"{linha[3]}%"
+            })
+        st.dataframe(tabela, use_container_width=True, hide_index=True)
     else:
-        st.info("🌟 Seja o primeiro a completar um quiz para inaugurar o Quadro de Destaque da Ala Periperi!")
+        st.info("Ainda não há participações registradas. O ranking aparecerá aqui assim que os primeiros estudos forem realizados.")
 
+# =======================================================
+# ABA 4: ÁREA DO PROFESSOR (CADASTRO MANUAL E IA)
+# =======================================================
+with aba_professor:
+    st.subheader("Painel do Professor e Liderança")
+    senha = st.text_input("Digite a senha do professor:", type="password")
 
-# ==============================================================================
-# ABA 3: ÁREA DO PROFESSOR (SENHA: periperi2026)
-# ==============================================================================
-with tab_professor:
-    st.subheader("🔒 Área Exclusiva do Professor")
-    st.caption("Gerenciamento de conteúdos, criação manual de questões e geração inteligente via IA.")
+    if senha == "periperi2026":
+        st.success("Acesso autorizado com sucesso!")
+        sub_tab1, sub_tab2 = st.tabs(["✍️ Cadastro Manual", "⚡ Gerador com IA (PDF/Texto)"])
 
-    # Autenticação por Senha
-    senha_digitada = st.text_input("Digite a senha do professor:", type="password", key="senha_prof")
+        # Inclusão Manual
+        with sub_tab1:
+            st.markdown("#### Inserir Pergunta Manualmente")
+            with st.form("form_nova_questao"):
+                tema_novo = st.text_input("Livro / Tema:", placeholder="Ex: Vem, e Segue-Me ou Livro de Mórmon")
+                cap_novo = st.text_input("Lição ou Capítulo:", placeholder="Ex: Alma 32 ou Mateus 5")
+                enun_novo = st.text_area("Enunciado da Pergunta:")
+                op_a = st.text_input("Alternativa A:")
+                op_b = st.text_input("Alternativa B:")
+                op_c = st.text_input("Alternativa C:")
+                op_d = st.text_input("Alternativa D:")
+                correta_letra = st.selectbox("Qual é a alternativa correta?", ["A", "B", "C", "D"])
+                explic_nova = st.text_area("Referência de Escritura / Explicação:")
 
-    if senha_digitada == "periperi2026":
-        st.success("🔓 Acesso autorizado! Bem-vindo, professor da Escola Dominical.")
+                btn_salvar_manual = st.form_submit_button("Salvar Pergunta no Banco")
 
-        prof_tab_manual, prof_tab_ia, prof_tab_gerenciar, prof_tab_fotos = st.tabs([
-            "✍️ Cadastrar Pergunta Manual",
-            "🤖 Importar via PDF com Gemini IA",
-            "🗂️ Gerenciar Questões",
-            "🖼️ Gerenciar Fotos (Assets)"
-        ])
+            if btn_salvar_manual:
+                if tema_novo and enun_novo and op_a and op_b and op_c and op_d:
+                    conn = sqlite3.connect(DB_FILE)
+                    c = conn.cursor()
+                    json_op = json.dumps({"A": op_a, "B": op_b, "C": op_c, "D": op_d})
+                    c.execute('''
+                        INSERT INTO questoes (livro_tema, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ''', (tema_novo, cap_novo, enun_novo, json_op, correta_letra, explic_nova))
+                    conn.commit()
+                    conn.close()
+                    st.success("Questão salva com sucesso no banco de dados!")
+                else:
+                    st.error("Preencha todos os campos obrigatórios.")
 
-        # ----------------------------------------------------------------------
-        # SUB-ABA 1: CADASTRO MANUAL
-        # ----------------------------------------------------------------------
-        with prof_tab_manual:
-            st.markdown("#### ✍️ Cadastrar Nova Pergunta no Banco")
-            with st.form("form_cadastrar_questao"):
-                col_m1, col_m2 = st.columns(2)
-                with col_m1:
-                    novo_tema = st.text_input(
-                        "Livro / Tema Principal:",
-                        placeholder="Ex: Vem, e Segue-Me — Livro de Mórmon",
-                        help="Nome do livro canônico ou foco temático da aula."
-                    )
-                with col_m2:
-                    novo_capitulo = st.text_input(
-                        "Capítulo / Lição:",
-                        placeholder="Ex: 2 Néfi 2 (O Plano de Salvação)",
-                        help="Referência específica da lição ou capítulo estudado."
-                    )
+        # Inclusão via Inteligência Artificial
+        with sub_tab2:
+            st.markdown("#### Gerar Questões via Manual/PDF com Gemini")
+            chave_api = st.secrets.get("GEMINI_API_KEY", "")
+            if not chave_api:
+                chave_api = st.text_input("Chave da API Gemini (opcional se já salva em secrets):", type="password")
 
-                novo_enunciado = st.text_area(
-                    "Enunciado da Questão:",
-                    placeholder="Digite a pergunta clara sobre o princípio doutrinário ou narrativa..."
-                )
+            tema_ia = st.text_input("Nome do Tema / Lição para as perguntas:", placeholder="Ex: Lição da Semana — D&C 20-22")
+            qtd_perguntas = st.slider("Quantidade de perguntas a gerar:", min_value=1, max_value=8, value=3)
+            arquivo_pdf = st.file_uploader("Suba o arquivo PDF do manual ou lição:", type=["pdf"])
 
-                st.markdown("**Opções de Resposta:**")
-                col_o1, col_o2 = st.columns(2)
-                with col_o1:
-                    op_a = st.text_input("Opção A:", placeholder="Texto da alternativa A")
-                    op_b = st.text_input("Opção B:", placeholder="Texto da alternativa B")
-                with col_o2:
-                    op_c = st.text_input("Opção C:", placeholder="Texto da alternativa C")
-                    op_d = st.text_input("Opção D:", placeholder="Texto da alternativa D")
-
-                col_correta, col_espaco = st.columns([1, 3])
-                with col_correta:
-                    nova_correta = st.selectbox("Alternativa Correta:", ["A", "B", "C", "D"])
-
-                nova_explicacao = st.text_area(
-                    "Explicação Doutrinária e Referência Escriturística:",
-                    placeholder="Ex: Alma 32:21 — A fé não é ter um perfeito conhecimento das coisas..."
-                )
-
-                salvar_manual = st.form_submit_button("💾 Salvar Questão no Banco de Dados", use_container_width=True)
-
-                if salvar_manual:
-                    if not novo_tema or not novo_capitulo or not novo_enunciado or not op_a or not op_b or not op_c or not op_d:
-                        st.error("⚠️ Por favor, preencha todos os campos obrigatórios e as 4 opções de resposta!")
-                    else:
-                        opcoes_dict = {"A": op_a, "B": op_b, "C": op_c, "D": op_d}
-                        nova_id = database.add_questao(
-                            livro_tema=novo_tema,
-                            capitulo_licao=novo_capitulo,
-                            enunciado=novo_enunciado,
-                            opcoes=opcoes_dict,
-                            correta=nova_correta,
-                            explicacao_referencia=nova_explicacao
-                        )
-                        st.success(f"✅ Questão #{nova_id} cadastrada com sucesso! Ela já está disponível no quiz.")
-                        st.rerun()
-
-        # ----------------------------------------------------------------------
-        # SUB-ABA 2: IMPORTAÇÃO VIA PDF COM GEMINI IA (google-genai)
-        # ----------------------------------------------------------------------
-        with prof_tab_ia:
-            st.markdown("#### 🤖 Geração Automática de Questões a partir de PDF (Google Gemini)")
-            st.caption("Faça upload de um manual, lição ou texto do 'Vem, e Segue-Me' em PDF. O Gemini lerá o conteúdo e gerará questões fiéis às escrituras.")
-
-            col_ia1, col_ia2 = st.columns([1.5, 1])
-            with col_ia1:
-                pdf_arquivo = st.file_uploader("Selecione o arquivo PDF da lição:", type=["pdf"])
-
-            with col_ia2:
-                # Permite usar variável de ambiente ou digitar chave
-                chave_env = os.environ.get("GEMINI_API_KEY", "")
-                gemini_api_key = st.text_input(
-                    "Chave de API do Gemini (GEMINI_API_KEY):",
-                    value=chave_env,
-                    type="password",
-                    help="Obtenha gratuitamente no Google AI Studio (aistudio.google.com)."
-                )
-
-            col_opt1, col_opt2, col_opt3 = st.columns(3)
-            with col_opt1:
-                tema_ia_sugerido = st.text_input("Tema / Livro para as questões:", value="Vem, e Segue-Me — Lição Atual")
-            with col_opt2:
-                capitulo_ia_sugerido = st.text_input("Capítulo / Lição:", value="Estudo da Semana")
-            with col_opt3:
-                qtd_questoes = st.slider("Quantidade de Questões:", min_value=2, max_value=10, value=3)
-
-            if st.button("🚀 Processar PDF e Gerar Questões com IA", use_container_width=True):
-                if not pdf_arquivo:
-                    st.error("⚠️ Por favor, selecione um arquivo PDF antes de prosseguir!")
-                elif not gemini_api_key.strip():
-                    st.error("⚠️ Por favor, informe sua chave de API do Gemini (GEMINI_API_KEY)!")
+            if arquivo_pdf and st.button("Gerar Perguntas com Inteligência Artificial"):
+                if not chave_api:
+                    st.error("Chave da API Gemini não informada.")
                 else:
                     try:
-                        with st.spinner("📄 Extraindo texto do documento PDF com pypdf..."):
-                            from pypdf import PdfReader
-                            reader = PdfReader(pdf_arquivo)
-                            texto_completo = ""
-                            for page in reader.pages:
-                                texto_extraido = page.extract_text()
-                                if texto_extraido:
-                                    texto_completo += texto_extraido + "\n"
+                        from google import genai
+                        from google.genai import types
+                        import pypdf
 
-                            if not texto_completo.strip():
-                                st.error("❌ Não foi possível extrair texto do PDF (o arquivo pode conter apenas imagens digitalizadas).")
-                                st.stop()
+                        # Extração de texto do PDF
+                        leitor = pypdf.PdfReader(arquivo_pdf)
+                        texto_pdf = ""
+                        for pag in leitor.pages:
+                            texto_pdf += (pag.extract_text() or "") + "\n"
 
-                            # Limita para não exceder limites de contexto razoáveis
-                            texto_contexto = texto_completo[:15000]
+                        client = genai.Client(api_key=chave_api)
+                        prompt_instrucao = (
+                            f"Você é um professor de Escola Dominical de A Igreja de Jesus Cristo dos Santos dos Últimos Dias. "
+                            f"Com base no texto do documento fornecido, crie exatamente {qtd_perguntas} perguntas edificantes de múltipla escolha "
+                            f"com 4 alternativas (A, B, C, D), indicando a resposta correta e a referência/explicação nas escrituras. "
+                            f"Retorne ESTRITAMENTE um array JSON puro (sem marcação de markdown ```json) no seguinte formato:\n"
+                            f'[{{"enunciado": "...", "opcoes": {{"A": "...", "B": "...", "C": "...", "D": "..."}}, "correta": "A", "explicacao": "..."}}]'
+                        )
 
-                        with st.spinner("🧠 Consultando Google Gemini para formular perguntas fiéis ao evangelho..."):
-                            from google import genai
-                            from google.genai import types
-
-                            client = genai.Client(api_key=gemini_api_key.strip())
-
-                            prompt = f"""
-Você é um especialista e instrutor da Escola Dominical de A Igreja de Jesus Cristo dos Santos dos Últimos Dias (Vem, e Segue-Me).
-Com base exclusivamente no texto fornecido abaixo da lição, crie exatamente {qtd_questoes} questões de múltipla escolha fiéis aos princípios doutrinários e narrativas das escrituras presentes no texto.
-
-TEXTO DA LIÇÃO:
-{texto_contexto}
-
-INSTRUÇÕES OBRIGATÓRIAS:
-1. Gere cada questão com 4 alternativas: "A", "B", "C" e "D".
-2. Indique exatamente uma alternativa correta ("A", "B", "C" ou "D").
-3. Forneça uma explicação detalhada citando a escritura ou o princípio correspondente.
-4. Responda ESTRITAMENTE em formato JSON com uma lista de objetos, sem blocos de texto adicionais além do JSON puro.
-
-Formato JSON esperado:
-[
-  {{
-    "enunciado": "Texto claro e inspirador da pergunta",
-    "opcoes": {{
-      "A": "Alternativa A",
-      "B": "Alternativa B",
-      "C": "Alternativa C",
-      "D": "Alternativa D"
-    }},
-    "correta": "A",
-    "explicacao_referencia": "Referência escriturística e explicação doutrinária"
-  }}
-]
-"""
-                            # Chamada à API oficial do Google Gemini
-                            response = client.models.generate_content(
-                                model="gemini-2.5-flash",
-                                contents=prompt,
-                                config=types.GenerateContentConfig(
-                                    response_mime_type="application/json"
+                        with st.spinner("O Gemini está analisando o manual e gerando as perguntas..."):
+                            # Se for PDF digital com texto legível
+                            if len(texto_pdf.strip()) > 100:
+                                resposta = client.models.generate_content(
+                                    model="gemini-2.5-flash",
+                                    contents=[prompt_instrucao, texto_pdf]
                                 )
-                            )
-
-                            resposta_texto = response.text.strip()
-
-                            # Tenta parsear o JSON retornado
-                            questoes_ia = json.loads(resposta_texto)
-
-                            if isinstance(questoes_ia, list) and len(questoes_ia) > 0:
-                                st.session_state["questoes_geradas_ia"] = questoes_ia
-                                st.session_state["tema_ia"] = tema_ia_sugerido
-                                st.session_state["capitulo_ia"] = capitulo_ia_sugerido
-                                st.success(f"🎉 Sucesso! {len(questoes_ia)} questões geradas pelo Gemini. Confira a pré-visualização abaixo:")
                             else:
-                                st.error("A resposta da IA não continha a lista esperada de questões.")
+                                # Fallback multimodal para escaneados
+                                arquivo_pdf.seek(0)
+                                pdf_bytes = arquivo_pdf.read()
+                                resposta = client.models.generate_content(
+                                    model="gemini-2.5-flash",
+                                    contents=[
+                                        types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+                                        prompt_instrucao
+                                    ]
+                                )
 
-                    except Exception as err:
-                        st.error(f"Erro durante a geração com Gemini: {str(err)}")
+                            texto_limpo = resposta.text.replace("```json", "").replace("```", "").strip()
+                            questoes_ia = json.loads(texto_limpo)
 
-            # Pré-visualização e confirmação de salvamento no SQLite
-            if "questoes_geradas_ia" in st.session_state and st.session_state["questoes_geradas_ia"]:
-                st.markdown("### 📋 Questões Geradas para Revisão:")
-                for i, q in enumerate(st.session_state["questoes_geradas_ia"], 1):
-                    with st.expander(f"Questão {i}: {q.get('enunciado')[:75]}...", expanded=True):
-                        st.markdown(f"**Enunciado:** {q.get('enunciado')}")
-                        ops = q.get("opcoes", {})
-                        st.markdown(f"- **A:** {ops.get('A')}")
-                        st.markdown(f"- **B:** {ops.get('B')}")
-                        st.markdown(f"- **C:** {ops.get('C')}")
-                        st.markdown(f"- **D:** {ops.get('D')}")
-                        st.markdown(f"**Gabarito Correto:** {q.get('correta')}")
-                        st.markdown(f"**Explicação:** {q.get('explicacao_referencia')}")
+                            conn = sqlite3.connect(DB_FILE)
+                            c = conn.cursor()
+                            for item in questoes_ia:
+                                c.execute('''
+                                    INSERT INTO questoes (livro_tema, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia)
+                                    VALUES (?, ?, ?, ?, ?, ?)
+                                ''', (
+                                    tema_ia if tema_ia else "Estudo do Evangelho",
+                                    "Lição IA",
+                                    item["enunciado"],
+                                    json.dumps(item["opcoes"]),
+                                    item["correta"],
+                                    item.get("explicacao", "")
+                                ))
+                            conn.commit()
+                            conn.close()
 
-                col_salvar_ia, col_descarta_ia = st.columns([2, 1])
-                with col_salvar_ia:
-                    if st.button("💾 Salvar Todas as Questões no Banco de Dados", type="primary", use_container_width=True):
-                        salvas = 0
-                        for q in st.session_state["questoes_geradas_ia"]:
-                            database.add_questao(
-                                livro_tema=st.session_state.get("tema_ia", "Vem, e Segue-Me"),
-                                capitulo_licao=st.session_state.get("capitulo_ia", "Lição Atual"),
-                                enunciado=q.get("enunciado", ""),
-                                opcoes=q.get("opcoes", {}),
-                                correta=q.get("correta", "A"),
-                                explicacao_referencia=q.get("explicacao_referencia", "")
-                            )
-                            salvas += 1
-                        st.session_state["questoes_geradas_ia"] = []
-                        st.success(f"✅ {salvas} questões salvas no banco de dados com sucesso!")
-                        st.rerun()
-
-                with col_descarta_ia:
-                    if st.button("🗑️ Descartar", use_container_width=True):
-                        st.session_state["questoes_geradas_ia"] = []
-                        st.rerun()
-
-        # ----------------------------------------------------------------------
-        # SUB-ABA 3: GERENCIAR QUESTÕES EXISTENTES
-        # ----------------------------------------------------------------------
-        with prof_tab_gerenciar:
-            st.markdown("#### 🗂️ Gerenciamento do Acervo de Perguntas")
-            todas_questoes = database.get_questoes()
-            st.write(f"**Total de perguntas ativas:** {len(todas_questoes)}")
-
-            if todas_questoes:
-                lista_tabela = []
-                for q in todas_questoes:
-                    lista_tabela.append({
-                        "ID": q["id"],
-                        "Tema": q["livro_tema"],
-                        "Capítulo": q["capitulo_licao"],
-                        "Enunciado": q["enunciado"],
-                        "Correta": q["correta"],
-                        "Explicação": q["explicacao_referencia"]
-                    })
-                st.dataframe(pd.DataFrame(lista_tabela), use_container_width=True, hide_index=True)
-
-                st.markdown("---")
-                st.markdown("##### 🗑️ Excluir Pergunta")
-                col_del_id, col_del_btn = st.columns([2, 1])
-                with col_del_id:
-                    id_para_excluir = st.selectbox(
-                        "Selecione o ID da pergunta a ser excluída:",
-                        options=[q["id"] for q in todas_questoes],
-                        format_func=lambda x: f"ID #{x} - {next((q['enunciado'][:60] + '...' for q in todas_questoes if q['id'] == x), '')}"
-                    )
-                with col_del_btn:
-                    st.write("")
-                    st.write("")
-                    if st.button("Confirmar Exclusão", type="secondary", use_container_width=True):
-                        sucesso = database.delete_questao(id_para_excluir)
-                        if sucesso:
-                            st.success(f"Questão #{id_para_excluir} removida com sucesso!")
-                            st.rerun()
-                        else:
-                            st.error("Não foi possível excluir a questão.")
-            else:
-                st.warning("O banco de questões está vazio.")
-
-        # ----------------------------------------------------------------------
-        # SUB-ABA 4: GERENCIAR FOTOS (ASSETS)
-        # ----------------------------------------------------------------------
-        with prof_tab_fotos:
-            st.markdown("#### 🖼️ Gerenciamento da Galeria de Fotos (pasta `assets/`)")
-            st.caption("Adicione fotos das aulas, atividades dominicais e momentos inspiradores da Ala Periperi.")
-
-            upload_foto = st.file_uploader("Enviar nova foto para a galeria:", type=["jpg", "jpeg", "png", "webp"])
-            if upload_foto is not None:
-                nome_foto = upload_foto.name
-                col_save_f1, col_save_f2 = st.columns([2, 1])
-                with col_save_f1:
-                    legenda_custom = st.text_input("Nome/Legenda para o arquivo:", value=Path(nome_foto).stem)
-                with col_save_f2:
-                    st.write("")
-                    st.write("")
-                    if st.button("Salvar Foto na Galeria", use_container_width=True):
-                        extensao = Path(nome_foto).suffix.lower()
-                        novo_caminho = Path("assets") / f"{legenda_custom.strip().replace(' ', '_')}{extensao}"
-                        os.makedirs("assets", exist_ok=True)
-                        with open(novo_caminho, "wb") as f:
-                            f.write(upload_foto.getbuffer())
-                        st.success(f"Foto salva com sucesso como `{novo_caminho.name}`!")
-                        st.rerun()
-
-            # Lista de fotos existentes
-            fotos_salvas = list(Path("assets").glob("*.*"))
-            if fotos_salvas:
-                st.markdown("##### Fotos Atualmente na Galeria:")
-                for f_item in fotos_salvas:
-                    if f_item.suffix.lower() in [".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif"]:
-                        c_img, c_info, c_btn = st.columns([1, 2, 1])
-                        with c_img:
-                            st.image(str(f_item), width=100)
-                        with c_info:
-                            st.write(f"**Arquivo:** `{f_item.name}`")
-                        with c_btn:
-                            if st.button(f"Excluir", key=f"del_foto_{f_item.name}"):
-                                try:
-                                    f_item.unlink()
-                                    st.success(f"Foto `{f_item.name}` removida!")
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Erro ao remover: {e}")
-
-    elif senha_digitada != "":
-        st.error("❌ Senha incorreta. Por favor, verifique a senha informada.")
-    else:
-        st.info("🔑 Digite a senha do professor para desbloquear as ferramentas administrativas.")
+                            st.success(f"Foram geradas e gravadas {len(questoes_ia)} perguntas no banco de dados!")
+                    except Exception as e:
+                        st.error(f"Erro ao processar com IA: {e}")
+    elif senha:
+        st.error("Senha incorreta. Digite a senha cadastrada para a liderança/professor.")
