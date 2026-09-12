@@ -540,7 +540,7 @@ with aba_professor:
 
                         with st.spinner("Processando e estruturando as questões..."):
                             resp = client.models.generate_content(
-                                model="gemini-2.5-flash",
+                                model="gemini-3.6-flash",
                                 contents=[prompt_parser, conteudo_texto]
                             )
                             texto_limpo = resp.text.replace("```json", "").replace("```", "").strip()
