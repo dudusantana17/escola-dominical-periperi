@@ -260,7 +260,7 @@ aba_home, aba_quiz, aba_ranking, aba_professor = st.tabs([
     "🏠 Início & Galeria",
     "📖 Estudo & Quiz",
     "🏆 Quadro de Destaque",
-    "🔐 Área do Professor"
+    "🔐 Área da Presidência"
 ])
 
 # =======================================================
