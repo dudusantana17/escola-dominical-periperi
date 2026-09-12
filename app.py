@@ -280,7 +280,7 @@ with aba_home:
         fotos = [os.path.join(pasta_assets, f) for f in os.listdir(pasta_assets) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
 
     st.divider()
-    st.markdown("### 📸 Nossa Unidade e Atividades")
+    st.markdown("###  Vem e Segue-me")
     if fotos:
         colunas = st.columns(min(len(fotos), 3))
         for idx, foto_path in enumerate(fotos):
