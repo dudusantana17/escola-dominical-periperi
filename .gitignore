@@ -1,0 +1,29 @@
+# Python & Virtual Environment
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+ENV/
+
+# Streamlit secrets & config
+.streamlit/secrets.toml
+
+# SQLite Database
+*.db
+*.sqlite3
+escola_dominical_periperi.db
+
+# Environment Variables & API Keys
+.env
+.env.*
+*.key
+*.pem
+
+# IDE & OS Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
