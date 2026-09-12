@@ -249,7 +249,7 @@ init_db()
 # =======================================================
 st.markdown("""
     <div class="church-header">
-        <div class="sub-sub">A Igreja de Jesus Cristo dos Santos dos Últimos Dias</div>
+        #<div class="sub-sub">A Igreja de Jesus Cristo dos Santos dos Últimos Dias</div>
         <h1>Escola Dominical — Ala Periperi</h1>
         <p>“Aprendei de mim e ouvi minhas palavras; andai na mansidão de meu Espírito e tereis paz em mim.” — D&C 19:23</p>
     </div>
