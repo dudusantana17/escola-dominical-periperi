@@ -249,7 +249,7 @@ init_db()
 # =======================================================
 st.markdown("""
     <div class="church-header">
-        <div class="sub-sub"></div>
+        <div class="sub-sub">A Igreja de Jesus Cristo dos Santos dos Últimos Dias</div>
         <h1>Escola Dominical — Ala Periperi</h1>
         <p>“Aprendei de mim e ouvi minhas palavras; andai na mansidão de meu Espírito e tereis paz em mim.” — D&C 19:23</p>
     </div>
@@ -260,7 +260,7 @@ aba_home, aba_quiz, aba_ranking, aba_professor = st.tabs([
     "🏠 Início & Galeria",
     "📖 Estudo & Quiz",
     "🏆 Quadro de Destaque",
-    "🔐 Área da Presidência"
+    "🔐 Área do Professor"
 ])
 
 # =======================================================
@@ -280,7 +280,7 @@ with aba_home:
         fotos = [os.path.join(pasta_assets, f) for f in os.listdir(pasta_assets) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
 
     st.divider()
-    st.markdown("###  Vem e Segue-me")
+    st.markdown("### 📸 Nossa Unidade e Atividades")
     if fotos:
         colunas = st.columns(min(len(fotos), 3))
         for idx, foto_path in enumerate(fotos):
@@ -459,7 +459,7 @@ with aba_ranking:
         st.info("Ainda não há participações registradas. O ranking aparecerá aqui assim que os primeiros estudos forem realizados.")
 
 # =======================================================
-# ABA 4: ÁREA DO PROFESSOR (CADASTRO, IMPORTAÇÃO E IA)
+# ABA 4: ÁREA DO PROFESSOR (CADASTRO, IA E GERENCIAMENTO)
 # =======================================================
 with aba_professor:
     st.subheader("Painel do Professor e Liderança")
@@ -480,16 +480,17 @@ with aba_professor:
                     st.error("Senha incorreta. Tente novamente.")
     else:
         col_ok, col_sair = st.columns([4, 1])
-        col_ok.success("Acesso autorizado com sucesso!")
+        col_ok.success("Acesso autorizado como liderança/professor!")
         if col_sair.button("Sair / Bloquear"):
             st.session_state.admin_logado = False
             st.rerun()
 
-        # Três opções de alimentação de dados
-        sub_tab1, sub_tab2, sub_tab3 = st.tabs([
-            "📋 Importar Questões Prontas (PDF / Texto)",
-            "⚡ Gerar Novas Questões da Matéria (IA)",
-            "✍️ Cadastro Manual"
+        # 4 Sub-abas organizadas e isoladas
+        sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs([
+            "📋 Importar Questões Prontas",
+            "⚡ Gerar com IA (Manual/PDF)",
+            "✍️ Cadastro Manual",
+            "🗑️ Gerenciar / Excluir Questões"
         ])
 
         # ----------------------------------------------------
@@ -497,16 +498,16 @@ with aba_professor:
         # ----------------------------------------------------
         with sub_tab1:
             st.markdown("#### Importar Questionário Pronto")
-            st.write("Suba um PDF com perguntas prontas ou cole o texto. A IA vai apenas ler, estruturar e salvar no banco de dados.")
+            st.write("Envie um PDF ou cole um texto com perguntas e respostas já prontas. A IA estrutura e salva no banco.")
 
             tema_import = st.text_input("Livro / Tema:", placeholder="Ex: Livro de Mórmon ou Vem, e Segue-Me", key="imp_tema")
             cap_import = st.text_input("Capítulo / Lição:", placeholder="Ex: Alma 32 ou Lição 14", key="imp_cap")
             
-            origem_import = st.radio("Como deseja enviar as questões prontas?", ["📄 Upload de PDF", "📝 Colar Texto"], horizontal=True)
+            origem_import = st.radio("Origem das questões:", ["📄 Upload de PDF", "📝 Colar Texto"], horizontal=True)
             
             conteudo_texto = ""
             if origem_import == "📄 Upload de PDF":
-                pdf_questoes = st.file_uploader("Selecione o PDF contendo as perguntas prontas:", type=["pdf"], key="pdf_pronto")
+                pdf_questoes = st.file_uploader("Selecione o PDF contendo as perguntas:", type=["pdf"], key="pdf_pronto")
                 if pdf_questoes:
                     try:
                         import pypdf
@@ -516,25 +517,25 @@ with aba_professor:
                     except Exception as e:
                         st.error(f"Erro ao ler PDF: {e}")
             else:
-                conteudo_texto = st.text_area("Cole aqui as perguntas com alternativas e gabarito:", height=220, placeholder="1. Qual o primeiro mandamento com promessa?\nA) Honra teu pai...\nB) Não matarás...\nGabarito: A\nRef: Efésios 6:2")
+                conteudo_texto = st.text_area("Cole aqui as perguntas com alternativas e gabarito:", height=200, placeholder="1. Pergunta...\nA) Opção\nB) Opção\nGabarito: A\nRef: Escritura...")
 
             btn_importar = st.button("Processar e Salvar Questões Prontas", use_container_width=True)
 
             if btn_importar:
                 chave_api = st.secrets.get("GEMINI_API_KEY", "")
                 if not chave_api:
-                    st.error("Chave do Gemini não configurada nos Secrets!")
+                    st.error("Chave GEMINI_API_KEY ausente nos Secrets!")
                 elif not tema_import or not conteudo_texto.strip():
-                    st.warning("Preencha o Tema e forneça o arquivo PDF ou texto com as questões.")
+                    st.warning("Preencha o Tema e informe o texto ou PDF com as questões.")
                 else:
                     try:
                         from google import genai
                         client = genai.Client(api_key=chave_api)
                         
                         prompt_parser = (
-                            "Você é um assistente de banco de dados. O usuário forneceu uma lista de perguntas e respostas já prontas. "
-                            "Sua tarefa é ESTRITAMENTE extrair cada questão, separar o enunciado, as 4 opções (A, B, C, D), a alternativa correta e a explicação/referência. "
-                            "Não invente novas perguntas. Retorne ESTRITAMENTE um JSON puro sem blocos markdown ```json no formato:\n"
+                            "Você é um assistente de banco de dados. O usuário forneceu perguntas e respostas prontas. "
+                            "Sua tarefa é extrair cada questão separando: enunciado, opções (A, B, C, D), alternativa correta e explicação/referência. "
+                            "Retorne ESTRITAMENTE um array JSON puro sem marcadores markdown ```json no formato:\n"
                             '[{"enunciado": "...", "opcoes": {"A": "...", "B": "...", "C": "...", "D": "..."}, "correta": "A", "explicacao": "..."}]'
                         )
 
@@ -563,7 +564,7 @@ with aba_professor:
                             conn.commit()
                             conn.close()
 
-                            st.success(f"✅ Sucesso! {len(questoes_extraidas)} questões prontas foram salvas no banco!")
+                            st.success(f"✅ {len(questoes_extraidas)} questões importadas com sucesso!")
                             st.rerun()
                     except Exception as err:
                         st.error(f"Erro ao processar: {err}")
@@ -573,21 +574,21 @@ with aba_professor:
         # ----------------------------------------------------
         with sub_tab2:
             st.markdown("#### Gerar Perguntas Inéditas de um Manual/PDF")
-            st.write("Envie o manual da lição ou discurso e o Gemini criará perguntas inéditas de múltipla escolha.")
+            st.write("Envie o PDF da lição e o Gemini criará novas perguntas de múltipla escolha.")
 
-            tema_ia = st.text_input("Livro / Tema da Lição:", placeholder="Ex: Vem, e Segue-Me — D&C 20-22", key="ia_tema")
-            cap_ia = st.text_input("Capítulo / Detalhe:", placeholder="Ex: Seções 20 a 22", key="ia_cap")
-            qtd_questoes = st.slider("Quantidade de perguntas a gerar:", min_value=1, max_value=10, value=3)
-            arquivo_manual = st.file_uploader("Suba o manual ou texto da lição (PDF):", type=["pdf"], key="pdf_manual")
+            tema_ia = st.text_input("Tema / Livro:", placeholder="Ex: Doutrina e Convênios", key="ia_tema")
+            cap_ia = st.text_input("Capítulo / Lição:", placeholder="Ex: Seções 20 a 22", key="ia_cap")
+            qtd_questoes = st.slider("Quantidade de perguntas:", min_value=1, max_value=8, value=3)
+            arquivo_manual = st.file_uploader("Upload do Manual / Texto (PDF):", type=["pdf"], key="pdf_manual")
 
-            btn_gerar_ia = st.button("⚡ Gerar Questões Inéditas com Gemini", use_container_width=True)
+            btn_gerar_ia = st.button("⚡ Gerar Perguntas com Gemini", use_container_width=True)
 
             if btn_gerar_ia:
                 chave_api = st.secrets.get("GEMINI_API_KEY", "")
                 if not chave_api:
-                    st.error("Chave GEMINI_API_KEY ausente!")
+                    st.error("Chave GEMINI_API_KEY ausente nos Secrets!")
                 elif not arquivo_manual:
-                    st.warning("Envie o arquivo PDF do manual da aula.")
+                    st.warning("Selecione o arquivo PDF do manual.")
                 else:
                     try:
                         from google import genai
@@ -603,7 +604,7 @@ with aba_professor:
                         prompt_instrucao = (
                             f"Você é um professor de Escola Dominical de A Igreja de Jesus Cristo dos Santos dos Últimos Dias. "
                             f"Com base no texto fornecido, crie exatamente {qtd_questoes} perguntas edificantes de múltipla escolha "
-                            f"com 4 alternativas (A, B, C, D), indicando a resposta correta e a referência nas escrituras. "
+                            f"com 4 opções (A, B, C, D), indicando a correta e a referência nas escrituras. "
                             f"Retorne ESTRITAMENTE um JSON puro sem marcadores markdown ```json no formato:\n"
                             '[{"enunciado": "...", "opcoes": {"A": "...", "B": "...", "C": "...", "D": "..."}, "correta": "A", "explicacao": "..."}]'
                         )
@@ -611,14 +612,14 @@ with aba_professor:
                         with st.spinner("O Gemini está lendo o manual e gerando perguntas..."):
                             if len(texto_manual.strip()) > 80:
                                 resposta = client.models.generate_content(
-                                    model="gemini-2.5-flash",
+                                    model="gemini-3.6-flash",
                                     contents=[prompt_instrucao, texto_manual]
                                 )
                             else:
                                 arquivo_manual.seek(0)
                                 pdf_bytes = arquivo_manual.read()
                                 resposta = client.models.generate_content(
-                                    model="gemini-2.5-flash",
+                                    model="gemini-3.6-flash",
                                     contents=[
                                         types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
                                         prompt_instrucao
@@ -645,13 +646,13 @@ with aba_professor:
                             conn.commit()
                             conn.close()
 
-                            st.success(f"Foram criadas e cadastradas {len(perguntas_novas)} perguntas com sucesso!")
+                            st.success(f"✅ {len(perguntas_novas)} perguntas geradas e salvas com sucesso!")
                             st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao gerar com IA: {e}")
 
         # ----------------------------------------------------
-        # SUB-ABA 3: CADASTRO MANUAL
+        # SUB-ABA 3: CADASTRO MANUAL (1 A 1)
         # ----------------------------------------------------
         with sub_tab3:
             st.markdown("#### Inserir Pergunta Manualmente")
@@ -682,7 +683,39 @@ with aba_professor:
                     ''', (tema_m.strip(), cap_m.strip(), enun_m.strip(), json_op, correta_m, explic_m.strip()))
                     conn.commit()
                     conn.close()
-                    st.success("Pergunta salva com sucesso!")
+                    st.success("Pergunta cadastrada com sucesso!")
                     st.rerun()
                 else:
                     st.error("Preencha todos os campos obrigatórios.")
+
+        # ----------------------------------------------------
+        # SUB-ABA 4: GERENCIAR E REMOVER QUESTÕES
+        # ----------------------------------------------------
+        with sub_tab4:
+            st.markdown("#### Lista de Questões Cadastradas")
+            st.write("Revise as perguntas presentes no sistema e remova qualquer item indesejado com um clique.")
+
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            c.execute("SELECT id, livro_tema, capitulo_licao, enunciado FROM questoes ORDER BY id DESC")
+            todas_questoes = c.fetchall()
+            conn.close()
+
+            if not todas_questoes:
+                st.info("Nenhuma questão cadastrada no banco de dados.")
+            else:
+                for q_id, q_tema, q_cap, q_enun in todas_questoes:
+                    col_texto, col_btn = st.columns([5, 1])
+                    with col_texto:
+                        st.markdown(f"**[{q_tema} — {q_cap}]** (ID #{q_id})")
+                        st.caption(q_enun[:130] + "..." if len(q_enun) > 130 else q_enun)
+                    with col_btn:
+                        if st.button("🗑️ Excluir", key=f"del_q_{q_id}"):
+                            conn = sqlite3.connect(DB_FILE)
+                            c = conn.cursor()
+                            c.execute("DELETE FROM questoes WHERE id = ?", (q_id,))
+                            conn.commit()
+                            conn.close()
+                            st.toast(f"Questão #{q_id} removida com sucesso!", icon="🗑️")
+                            st.rerun()
+                    st.divider()
