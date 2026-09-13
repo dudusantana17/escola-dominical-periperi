@@ -145,7 +145,7 @@ st.markdown("""
     .podio-nome { font-weight: 700; font-size: 16px; color: #0b2545; }
     .podio-media { font-size: 20px; font-weight: 700; color: #133b68; margin-top: 4px; }
 
-    /* Destaque de Constância / Fidelidade */
+    /* Destaque de Constância */
     .constancia-box {
         background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
         border: 1px solid #eab308;
@@ -267,7 +267,7 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Navegação do Sistema em Abas
+# Navegação em Abas
 aba_home, aba_quiz, aba_ranking, aba_professor = st.tabs([
     "🏠 Início & Galeria",
     "📖 Estudo & Quiz",
@@ -372,7 +372,6 @@ with aba_quiz:
                     total = len(questoes)
                     porcentagem = round((acertos / total) * 100, 1)
 
-                    # Gravar no SQLite (guarda formato YYYY-MM-DD HH:MM:SS para filtros de data perfeitos)
                     agora_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     conn = sqlite3.connect(DB_FILE)
                     c = conn.cursor()
@@ -403,7 +402,7 @@ with aba_quiz:
                             st.info(f"**Referência & Reflexão:** {explicacao}")
 
 # =======================================================
-# ABA 3: QUADRO DE DESTAQUE (MENSAL, CONSTÂNCIA E GERAL)
+# ABA 3: QUADRO DE DESTAQUE (MENSAL, GRÁFICOS E GERAL)
 # =======================================================
 with aba_ranking:
     st.subheader("Quadro de Participação e Destaque")
@@ -423,18 +422,15 @@ with aba_ranking:
     if not todos_registros:
         st.info("Ainda não há participações registradas. O ranking aparecerá aqui assim que os primeiros estudos forem realizados.")
     else:
-        # ----------------------------------------------------
-        # 1. PROCESSAMENTO DE DADOS (MÊS vs SEMANAS)
-        # ----------------------------------------------------
+        # Agregação prévia de dados
         semanas_registradas_no_mes = set()
         dados_mes = {}
         dados_gerais = {}
-        participacao_semanal = {} # {aluno: set(semanas)}
+        participacao_semanal = {}
 
         for reg in todos_registros:
             _, nome, tema, acertos, total, porcentagem, data_h = reg
             
-            # Parsing flexível de datas antigas ou novas
             dt_obj = None
             for fmt in ("%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M"):
                 try:
@@ -443,14 +439,12 @@ with aba_ranking:
                 except Exception:
                     pass
 
-            # Agregação Geral
             if nome not in dados_gerais:
                 dados_gerais[nome] = {"estudos": 0, "acertos": 0, "porcentagens": []}
             dados_gerais[nome]["estudos"] += 1
             dados_gerais[nome]["acertos"] += acertos
             dados_gerais[nome]["porcentagens"].append(porcentagem)
 
-            # Agregação Mensal e Semanal
             if dt_obj and dt_obj.strftime("%Y-%m") == prefixo_mes:
                 sem_ano = dt_obj.isocalendar()[1]
                 semanas_registradas_no_mes.add(sem_ano)
@@ -465,12 +459,7 @@ with aba_ranking:
                 dados_mes[nome]["acertos"] += acertos
                 dados_mes[nome]["porcentagens"].append(porcentagem)
 
-        # ----------------------------------------------------
-        # SEÇÃO 1: DESTAQUES DE FIDELIDADE (TODAS AS SEMANAS)
-        # ----------------------------------------------------
-        st.markdown(f"#### 📅 Desempenho do Mês ({nome_mes_extenso} / {ano_atual})")
-        
-        # Quem participou de todas as semanas ativas do mês
+        # Identificação de quem participou de todas as semanas do mês
         alunos_todas_semanas = []
         if semanas_registradas_no_mes:
             total_semanas = len(semanas_registradas_no_mes)
@@ -478,6 +467,16 @@ with aba_ranking:
                 if len(sems) == total_semanas:
                     alunos_todas_semanas.append(aluno)
 
+        # Montagem da lista_geral antes de qualquer uso
+        lista_geral = []
+        for n, d in dados_gerais.items():
+            media = round(sum(d["porcentagens"]) / len(d["porcentagens"]), 1)
+            selo = " ⭐ (Todas as semanas)" if n in alunos_todas_semanas else ""
+            lista_geral.append((f"{n}{selo}", d["estudos"], d["acertos"], media))
+        lista_geral.sort(key=lambda x: (x[3], x[2]), reverse=True)
+
+        # 1. Seção de Constância
+        st.markdown(f"#### 📅 Desempenho do Mês ({nome_mes_extenso} / {ano_atual})")
         if alunos_todas_semanas:
             nomes_constantes = ", ".join([f"**{a}**" for a in alunos_todas_semanas])
             st.markdown(f"""
@@ -487,9 +486,7 @@ with aba_ranking:
                 </div>
             """, unsafe_allow_html=True)
 
-        # ----------------------------------------------------
-        # SEÇÃO 2: PÓDIO DO MÊS
-        # ----------------------------------------------------
+        # 2. Pódio do Mês
         if dados_mes:
             lista_mes = []
             for n, d in dados_mes.items():
@@ -528,21 +525,14 @@ with aba_ranking:
                             <div style="font-size:12px; color:#64748b;">3º Lugar do Mês</div>
                         </div>
                     """, unsafe_allow_html=True)
-        else:
-            st.caption(f"Nenhum estudo realizado ainda no mês de {nome_mes_extenso}.")
 
-
-# ----------------------------------------------------
-        # SEÇÃO VISUAL: GRÁFICOS DE DESEMPENHO E ENGAJAMENTO
-        # ----------------------------------------------------
+        # 3. Gráficos Visuais de Engajamento
         st.write("")
         st.markdown("#### 📊 Gráficos de Engajamento da Ala")
-        
         col_g1, col_g2 = st.columns(2)
 
         with col_g1:
             st.caption("📈 **Média de Aproveitamento dos Alunos (%)**")
-            # Monta dados para gráfico de desempenho
             nomes_grafico = [item[0].split(" ⭐")[0] for item in lista_geral[:10]]
             medias_grafico = [item[3] for item in lista_geral[:10]]
             dados_chart_media = dict(zip(nomes_grafico, medias_grafico))
@@ -550,35 +540,19 @@ with aba_ranking:
 
         with col_g2:
             st.caption("📚 **Estudos Realizados por Livro / Tema**")
-            # Consulta contagem por livro/tema
             conn = sqlite3.connect(DB_FILE)
             c = conn.cursor()
             c.execute("SELECT tema, COUNT(id) FROM ranking GROUP BY tema")
             dados_temas = dict(c.fetchall())
             conn.close()
-            
             if dados_temas:
                 st.bar_chart(dados_temas)
             else:
-                st.info("Aguardando mais estudos para gerar o mapa de temas.")
+                st.info("Aguardando mais dados para gerar o gráfico de temas.")
 
-
-
-        
-        # ----------------------------------------------------
-        # SEÇÃO 3: CLASSIFICAÇÃO GERAL ACUMULADA
-        # ----------------------------------------------------
+        # 4. Tabela Geral Acumulada
         st.divider()
         st.markdown("#### 🌟 Classificação Geral Acumulada")
-        
-        lista_geral = []
-        for n, d in dados_gerais.items():
-            media = round(sum(d["porcentagens"]) / len(d["porcentagens"]), 1)
-            # Selo de fidelidade na tabela
-            selo = " ⭐ (Todas as semanas)" if n in alunos_todas_semanas else ""
-            lista_geral.append((f"{n}{selo}", d["estudos"], d["acertos"], media))
-        lista_geral.sort(key=lambda x: (x[3], x[2]), reverse=True)
-
         tabela = []
         for pos, linha in enumerate(lista_geral, 1):
             tabela.append({
@@ -623,9 +597,7 @@ with aba_professor:
             "🗑️ Gerenciar / Excluir Questões"
         ])
 
-        # ----------------------------------------------------
-        # SUB-ABA 1: IMPORTAR QUESTÕES JÁ FEITAS
-        # ----------------------------------------------------
+        # SUB-ABA 1: IMPORTAR
         with sub_tab1:
             st.markdown("#### Importar Questionário Pronto")
             st.write("Envie um PDF ou cole um texto com perguntas e respostas já prontas. A IA estrutura e salva no banco.")
@@ -698,9 +670,7 @@ with aba_professor:
                     except Exception as err:
                         st.error(f"Erro ao processar: {err}")
 
-        # ----------------------------------------------------
-        # SUB-ABA 2: GERADOR COM IA (A PARTIR DA MATÉRIA)
-        # ----------------------------------------------------
+        # SUB-ABA 2: GERADOR IA
         with sub_tab2:
             st.markdown("#### Gerar Perguntas Inéditas de um Manual/PDF")
             st.write("Envie o PDF da lição e o Gemini criará novas perguntas de múltipla escolha.")
@@ -780,9 +750,7 @@ with aba_professor:
                     except Exception as e:
                         st.error(f"Erro ao gerar com IA: {e}")
 
-        # ----------------------------------------------------
-        # SUB-ABA 3: CADASTRO MANUAL (1 A 1)
-        # ----------------------------------------------------
+        # SUB-ABA 3: MANUAL
         with sub_tab3:
             st.markdown("#### Inserir Pergunta Manualmente")
             with st.form("form_manual_novo"):
@@ -817,9 +785,7 @@ with aba_professor:
                 else:
                     st.error("Preencha todos os campos obrigatórios.")
 
-        # ----------------------------------------------------
-        # SUB-ABA 4: GERENCIAR E REMOVER QUESTÕES
-        # ----------------------------------------------------
+        # SUB-ABA 4: EXCLUIR
         with sub_tab4:
             st.markdown("#### Lista de Questões Cadastradas")
             st.write("Revise as perguntas presentes no sistema e remova qualquer item indesejado com um clique.")
