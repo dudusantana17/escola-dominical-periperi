@@ -531,6 +531,40 @@ with aba_ranking:
         else:
             st.caption(f"Nenhum estudo realizado ainda no mês de {nome_mes_extenso}.")
 
+
+# ----------------------------------------------------
+        # SEÇÃO VISUAL: GRÁFICOS DE DESEMPENHO E ENGAJAMENTO
+        # ----------------------------------------------------
+        st.write("")
+        st.markdown("#### 📊 Gráficos de Engajamento da Ala")
+        
+        col_g1, col_g2 = st.columns(2)
+
+        with col_g1:
+            st.caption("📈 **Média de Aproveitamento dos Alunos (%)**")
+            # Monta dados para gráfico de desempenho
+            nomes_grafico = [item[0].split(" ⭐")[0] for item in lista_geral[:10]]
+            medias_grafico = [item[3] for item in lista_geral[:10]]
+            dados_chart_media = dict(zip(nomes_grafico, medias_grafico))
+            st.bar_chart(dados_chart_media)
+
+        with col_g2:
+            st.caption("📚 **Estudos Realizados por Livro / Tema**")
+            # Consulta contagem por livro/tema
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            c.execute("SELECT tema, COUNT(id) FROM ranking GROUP BY tema")
+            dados_temas = dict(c.fetchall())
+            conn.close()
+            
+            if dados_temas:
+                st.bar_chart(dados_temas)
+            else:
+                st.info("Aguardando mais estudos para gerar o mapa de temas.")
+
+
+
+        
         # ----------------------------------------------------
         # SEÇÃO 3: CLASSIFICAÇÃO GERAL ACUMULADA
         # ----------------------------------------------------
