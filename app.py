@@ -137,13 +137,25 @@ st.markdown("""
         background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 12px;
-        padding: 20px;
+        padding: 18px;
         text-align: center;
         box-shadow: 0 4px 12px rgba(0,0,0,0.04);
     }
-    .podio-pos { font-size: 32px; margin-bottom: 6px; }
-    .podio-nome { font-weight: 700; font-size: 17px; color: #0b2545; }
-    .podio-media { font-size: 22px; font-weight: 700; color: #133b68; margin-top: 4px; }
+    .podio-pos { font-size: 28px; margin-bottom: 4px; }
+    .podio-nome { font-weight: 700; font-size: 16px; color: #0b2545; }
+    .podio-media { font-size: 20px; font-weight: 700; color: #133b68; margin-top: 4px; }
+
+    /* Destaque de Constância / Fidelidade */
+    .constancia-box {
+        background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
+        border: 1px solid #eab308;
+        border-left: 6px solid #ca8a04;
+        padding: 14px 20px;
+        border-radius: 10px;
+        margin: 15px 0;
+        color: #713f12;
+        font-weight: 500;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -273,7 +285,6 @@ with aba_home:
         "reforçar as escrituras e incentivar a preparação de cada membro para as aulas de domingo."
     )
 
-    # Verificação e Exibição de Fotos da pasta assets/
     pasta_assets = "assets"
     fotos = []
     if os.path.exists(pasta_assets):
@@ -361,13 +372,14 @@ with aba_quiz:
                     total = len(questoes)
                     porcentagem = round((acertos / total) * 100, 1)
 
-                    # Gravar no SQLite
+                    # Gravar no SQLite (guarda formato YYYY-MM-DD HH:MM:SS para filtros de data perfeitos)
+                    agora_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     conn = sqlite3.connect(DB_FILE)
                     c = conn.cursor()
                     c.execute('''
                         INSERT INTO ranking (nome_aluno, tema, acertos, total, porcentagem, data_hora)
                         VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (nome_aluno.strip().title(), tema_selecionado, acertos, total, porcentagem, datetime.now().strftime("%d/%m/%Y %H:%M")))
+                    ''', (nome_aluno.strip().title(), tema_selecionado, acertos, total, porcentagem, agora_iso))
                     conn.commit()
                     conn.close()
 
@@ -391,72 +403,158 @@ with aba_quiz:
                             st.info(f"**Referência & Reflexão:** {explicacao}")
 
 # =======================================================
-# ABA 3: QUADRO DE DESTAQUE (RANKING)
+# ABA 3: QUADRO DE DESTAQUE (MENSAL, CONSTÂNCIA E GERAL)
 # =======================================================
 with aba_ranking:
     st.subheader("Quadro de Participação e Destaque")
+    
+    agora = datetime.now()
+    ano_atual = agora.strftime("%Y")
+    mes_atual = agora.strftime("%m")
+    prefixo_mes = f"{ano_atual}-{mes_atual}"
+    nome_mes_extenso = agora.strftime("%B").capitalize()
+
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute('''
-        SELECT 
-            nome_aluno,
-            COUNT(id) as total_estudos,
-            SUM(acertos) as total_acertos,
-            ROUND(AVG(porcentagem), 1) as media_aproveitamento
-        FROM ranking
-        GROUP BY nome_aluno
-        ORDER BY media_aproveitamento DESC, total_acertos DESC
-    ''')
-    dados_ranking = c.fetchall()
+    c.execute("SELECT id, nome_aluno, tema, acertos, total, porcentagem, data_hora FROM ranking")
+    todos_registros = c.fetchall()
     conn.close()
 
-    if dados_ranking:
-        st.write("")
-        col_p1, col_p2, col_p3 = st.columns(3)
-        if len(dados_ranking) >= 1:
-            with col_p1:
-                st.markdown(f"""
-                    <div class="podio-card" style="border-top: 4px solid #d4af37;">
-                        <div class="podio-pos">🥇</div>
-                        <div class="podio-nome">{dados_ranking[0][0]}</div>
-                        <div class="podio-media">{dados_ranking[0][3]}%</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:4px;">1º Lugar Geral</div>
-                    </div>
-                """, unsafe_allow_html=True)
-        if len(dados_ranking) >= 2:
-            with col_p2:
-                st.markdown(f"""
-                    <div class="podio-card" style="border-top: 4px solid #94a3b8;">
-                        <div class="podio-pos">🥈</div>
-                        <div class="podio-nome">{dados_ranking[1][0]}</div>
-                        <div class="podio-media">{dados_ranking[1][3]}%</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:4px;">2º Lugar Geral</div>
-                    </div>
-                """, unsafe_allow_html=True)
-        if len(dados_ranking) >= 3:
-            with col_p3:
-                st.markdown(f"""
-                    <div class="podio-card" style="border-top: 4px solid #b45309;">
-                        <div class="podio-pos">🥉</div>
-                        <div class="podio-nome">{dados_ranking[2][0]}</div>
-                        <div class="podio-media">{dados_ranking[2][3]}%</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:4px;">3º Lugar Geral</div>
-                    </div>
-                """, unsafe_allow_html=True)
+    if not todos_registros:
+        st.info("Ainda não há participações registradas. O ranking aparecerá aqui assim que os primeiros estudos forem realizados.")
+    else:
+        # ----------------------------------------------------
+        # 1. PROCESSAMENTO DE DADOS (MÊS vs SEMANAS)
+        # ----------------------------------------------------
+        semanas_registradas_no_mes = set()
+        dados_mes = {}
+        dados_gerais = {}
+        participacao_semanal = {} # {aluno: set(semanas)}
 
-        st.write("")
+        for reg in todos_registros:
+            _, nome, tema, acertos, total, porcentagem, data_h = reg
+            
+            # Parsing flexível de datas antigas ou novas
+            dt_obj = None
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M"):
+                try:
+                    dt_obj = datetime.strptime(data_h, fmt)
+                    break
+                except Exception:
+                    pass
+
+            # Agregação Geral
+            if nome not in dados_gerais:
+                dados_gerais[nome] = {"estudos": 0, "acertos": 0, "porcentagens": []}
+            dados_gerais[nome]["estudos"] += 1
+            dados_gerais[nome]["acertos"] += acertos
+            dados_gerais[nome]["porcentagens"].append(porcentagem)
+
+            # Agregação Mensal e Semanal
+            if dt_obj and dt_obj.strftime("%Y-%m") == prefixo_mes:
+                sem_ano = dt_obj.isocalendar()[1]
+                semanas_registradas_no_mes.add(sem_ano)
+
+                if nome not in participacao_semanal:
+                    participacao_semanal[nome] = set()
+                participacao_semanal[nome].add(sem_ano)
+
+                if nome not in dados_mes:
+                    dados_mes[nome] = {"estudos": 0, "acertos": 0, "porcentagens": []}
+                dados_mes[nome]["estudos"] += 1
+                dados_mes[nome]["acertos"] += acertos
+                dados_mes[nome]["porcentagens"].append(porcentagem)
+
+        # ----------------------------------------------------
+        # SEÇÃO 1: DESTAQUES DE FIDELIDADE (TODAS AS SEMANAS)
+        # ----------------------------------------------------
+        st.markdown(f"#### 📅 Desempenho do Mês ({nome_mes_extenso} / {ano_atual})")
+        
+        # Quem participou de todas as semanas ativas do mês
+        alunos_todas_semanas = []
+        if semanas_registradas_no_mes:
+            total_semanas = len(semanas_registradas_no_mes)
+            for aluno, sems in participacao_semanal.items():
+                if len(sems) == total_semanas:
+                    alunos_todas_semanas.append(aluno)
+
+        if alunos_todas_semanas:
+            nomes_constantes = ", ".join([f"**{a}**" for a in alunos_todas_semanas])
+            st.markdown(f"""
+                <div class="constancia-box">
+                    ⭐ <b>Constância Exemplar:</b> Participaram em <b>todas as semanas</b> de {nome_mes_extenso}:<br>
+                    {nomes_constantes} 👏
+                </div>
+            """, unsafe_allow_html=True)
+
+        # ----------------------------------------------------
+        # SEÇÃO 2: PÓDIO DO MÊS
+        # ----------------------------------------------------
+        if dados_mes:
+            lista_mes = []
+            for n, d in dados_mes.items():
+                media = round(sum(d["porcentagens"]) / len(d["porcentagens"]), 1)
+                lista_mes.append((n, d["estudos"], d["acertos"], media))
+            lista_mes.sort(key=lambda x: (x[3], x[2]), reverse=True)
+
+            col_m1, col_m2, col_m3 = st.columns(3)
+            if len(lista_mes) >= 1:
+                with col_m1:
+                    st.markdown(f"""
+                        <div class="podio-card" style="border-top: 4px solid #d4af37;">
+                            <div class="podio-pos">🥇</div>
+                            <div class="podio-nome">{lista_mes[0][0]}</div>
+                            <div class="podio-media">{lista_mes[0][3]}%</div>
+                            <div style="font-size:12px; color:#64748b;">1º Lugar do Mês</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+            if len(lista_mes) >= 2:
+                with col_m2:
+                    st.markdown(f"""
+                        <div class="podio-card" style="border-top: 4px solid #94a3b8;">
+                            <div class="podio-pos">🥈</div>
+                            <div class="podio-nome">{lista_mes[1][0]}</div>
+                            <div class="podio-media">{lista_mes[1][3]}%</div>
+                            <div style="font-size:12px; color:#64748b;">2º Lugar do Mês</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+            if len(lista_mes) >= 3:
+                with col_m3:
+                    st.markdown(f"""
+                        <div class="podio-card" style="border-top: 4px solid #b45309;">
+                            <div class="podio-pos">🥉</div>
+                            <div class="podio-nome">{lista_mes[2][0]}</div>
+                            <div class="podio-media">{lista_mes[2][3]}%</div>
+                            <div style="font-size:12px; color:#64748b;">3º Lugar do Mês</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.caption(f"Nenhum estudo realizado ainda no mês de {nome_mes_extenso}.")
+
+        # ----------------------------------------------------
+        # SEÇÃO 3: CLASSIFICAÇÃO GERAL ACUMULADA
+        # ----------------------------------------------------
+        st.divider()
+        st.markdown("#### 🌟 Classificação Geral Acumulada")
+        
+        lista_geral = []
+        for n, d in dados_gerais.items():
+            media = round(sum(d["porcentagens"]) / len(d["porcentagens"]), 1)
+            # Selo de fidelidade na tabela
+            selo = " ⭐ (Todas as semanas)" if n in alunos_todas_semanas else ""
+            lista_geral.append((f"{n}{selo}", d["estudos"], d["acertos"], media))
+        lista_geral.sort(key=lambda x: (x[3], x[2]), reverse=True)
+
         tabela = []
-        for pos, linha in enumerate(dados_ranking, 1):
+        for pos, linha in enumerate(lista_geral, 1):
             tabela.append({
                 "Posição": f"{pos}º",
                 "Membro / Aluno": linha[0],
-                "Estudos Realizados": linha[1],
-                "Acertos Totais": linha[2],
-                "Média de Acertos": f"{linha[3]}%"
+                "Estudos Feitos": linha[1],
+                "Total Acertos": linha[2],
+                "Média Geral": f"{linha[3]}%"
             })
         st.dataframe(tabela, use_container_width=True, hide_index=True)
-    else:
-        st.info("Ainda não há participações registradas. O ranking aparecerá aqui assim que os primeiros estudos forem realizados.")
 
 # =======================================================
 # ABA 4: ÁREA DO PROFESSOR (CADASTRO, IA E GERENCIAMENTO)
@@ -464,7 +562,6 @@ with aba_ranking:
 with aba_professor:
     st.subheader("Painel do Professor e Liderança")
     
-    # Controle de sessão para login
     if "admin_logado" not in st.session_state:
         st.session_state.admin_logado = False
 
@@ -485,7 +582,6 @@ with aba_professor:
             st.session_state.admin_logado = False
             st.rerun()
 
-        # 4 Sub-abas organizadas e isoladas
         sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs([
             "📋 Importar Questões Prontas",
             "⚡ Gerar com IA (Manual/PDF)",
@@ -502,7 +598,6 @@ with aba_professor:
 
             tema_import = st.text_input("Livro / Tema:", placeholder="Ex: Livro de Mórmon ou Vem, e Segue-Me", key="imp_tema")
             cap_import = st.text_input("Capítulo / Lição:", placeholder="Ex: Alma 32 ou Lição 14", key="imp_cap")
-            
             origem_import = st.radio("Origem das questões:", ["📄 Upload de PDF", "📝 Colar Texto"], horizontal=True)
             
             conteudo_texto = ""
