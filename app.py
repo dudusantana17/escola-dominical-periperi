@@ -1,7 +1,8 @@
 import streamlit as st
-import sqlite3
+from supabase import create_client, Client
 import json
 import os
+import time
 from datetime import datetime
 from PIL import Image
 
@@ -16,7 +17,7 @@ st.set_page_config(
 )
 
 # =======================================================
-# 2. DESIGN VISUAL E CSS REFINADO (A IGREJA DE JESUS CRISTO)
+# 2. DESIGN VISUAL E CSS INSTITUCIONAL
 # =======================================================
 st.markdown("""
     <style>
@@ -31,7 +32,6 @@ st.markdown("""
         background-color: #f8fafc;
     }
 
-    /* Cabeçalho Hero Institucional */
     .church-header {
         background: linear-gradient(135deg, #0b2545 0%, #133b68 60%, #1d4e89 100%);
         border-bottom: 3px solid #c5a059;
@@ -65,7 +65,6 @@ st.markdown("""
         font-style: italic;
     }
 
-    /* Cartões de Questão */
     .quiz-card {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
@@ -82,10 +81,7 @@ st.markdown("""
         margin-bottom: 8px;
     }
 
-    /* Alternativas de Resposta (stRadio) */
-    div[data-testid="stRadio"] > div {
-        gap: 10px;
-    }
+    div[data-testid="stRadio"] > div { gap: 10px; }
     div[data-testid="stRadio"] label {
         background: #ffffff !important;
         border: 1px solid #cbd5e1 !important;
@@ -102,7 +98,6 @@ st.markdown("""
         transform: translateX(4px);
     }
 
-    /* Botão Principal */
     .stButton > button {
         background: linear-gradient(135deg, #0b2545 0%, #133b68 100%) !important;
         color: #ffffff !important;
@@ -122,7 +117,6 @@ st.markdown("""
         transform: translateY(-1px);
     }
 
-    /* Cartões de Métricas */
     [data-testid="stMetric"] {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
@@ -132,7 +126,6 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
     }
 
-    /* Pódio do Ranking */
     .podio-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
@@ -145,7 +138,6 @@ st.markdown("""
     .podio-nome { font-weight: 700; font-size: 16px; color: #0b2545; }
     .podio-media { font-size: 20px; font-weight: 700; color: #133b68; margin-top: 4px; }
 
-    /* Destaque de Constância */
     .constancia-box {
         background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
         border: 1px solid #eab308;
@@ -160,39 +152,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =======================================================
-# 3. BANCO DE DADOS (SQLite Local - Sem inserções automáticas)
+# 3. CONEXÃO COM O SUPABASE
 # =======================================================
-DB_FILE = "escola_dominical_periperi.db"
+@st.cache_resource
+def get_supabase_client() -> Client:
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
 
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS questoes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            livro_tema TEXT,
-            capitulo_licao TEXT,
-            enunciado TEXT,
-            opcoes_json TEXT,
-            correta TEXT,
-            explicacao_referencia TEXT
-        )
-    ''')
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS ranking (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome_aluno TEXT,
-            tema TEXT,
-            acertos INTEGER,
-            total INTEGER,
-            porcentagem REAL,
-            data_hora TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-init_db()
+supabase = get_supabase_client()
 
 # =======================================================
 # 4. CABEÇALHO HERO INSTITUCIONAL
@@ -205,7 +173,6 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Navegação em Abas
 aba_home, aba_quiz, aba_ranking, aba_professor = st.tabs([
     "🏠 Início & Galeria",
     "📖 Estudo & Quiz",
@@ -241,7 +208,7 @@ with aba_home:
             except Exception:
                 pass
     else:
-        st.info("💡 **Dica:** Coloque fotos de nossa capela, da classe ou de atividades na pasta `assets/` do projeto para exibi-las aqui na página inicial.")
+        st.info("💡 Coloque fotos na pasta `assets/` do projeto no GitHub para exibi-las aqui.")
 
 # =======================================================
 # ABA 2: ESTUDO & QUIZ DO ALUNO
@@ -254,19 +221,19 @@ with aba_quiz:
         nome_aluno = st.text_input("Seu Nome (ou Nome Completo):", placeholder="Ex: Irmão Souza / Taís")
 
     with col2:
-        conn = sqlite3.connect(DB_FILE)
-        temas = [r[0] for r in conn.cursor().execute("SELECT DISTINCT livro_tema FROM questoes").fetchall()]
-        conn.close()
-        tema_selecionado = st.selectbox("Livro / Programa:", temas if temas else ["Nenhum tema cadastrado"])
+        try:
+            res_temas = supabase.table("questoes").select("livro_tema").execute()
+            temas_disponiveis = list(set([item["livro_tema"] for item in res_temas.data])) if res_temas.data else []
+        except Exception:
+            temas_disponiveis = []
+            
+        tema_selecionado = st.selectbox("Livro / Programa:", temas_disponiveis if temas_disponiveis else ["Nenhum tema cadastrado"])
 
     if not nome_aluno:
         st.info("👆 Por favor, preencha o seu nome acima para iniciar as perguntas.")
     else:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute("SELECT id, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia FROM questoes WHERE livro_tema = ?", (tema_selecionado,))
-        questoes = c.fetchall()
-        conn.close()
+        res_questoes = supabase.table("questoes").select("*").eq("livro_tema", tema_selecionado).execute()
+        questoes = res_questoes.data
 
         if not questoes:
             st.warning("Ainda não há perguntas cadastradas para este tema.")
@@ -274,13 +241,13 @@ with aba_quiz:
             with st.form("form_estudo_dominical"):
                 respostas_usuario = {}
                 for idx, q in enumerate(questoes, 1):
-                    q_id, capitulo, enunciado, opcoes_str, correta, explicacao = q
-                    opcoes = json.loads(opcoes_str)
+                    q_id = q["id"]
+                    opcoes = q["opcoes_json"] if isinstance(q["opcoes_json"], dict) else json.loads(q["opcoes_json"])
 
                     st.markdown(f"""
                         <div class="quiz-card">
-                            <div class="quiz-title">📖 Pergunta {idx:02d} — {capitulo}</div>
-                            <div style="font-size: 15px; line-height: 1.6;">{enunciado}</div>
+                            <div class="quiz-title">📖 Pergunta {idx:02d} — {q['capitulo_licao']}</div>
+                            <div style="font-size: 15px; line-height: 1.6;">{q['enunciado']}</div>
                         </div>
                     """, unsafe_allow_html=True)
 
@@ -294,8 +261,8 @@ with aba_quiz:
                     )
                     respostas_usuario[q_id] = {
                         "escolha": escolha[0] if escolha else None,
-                        "correta": correta,
-                        "explicacao": explicacao
+                        "correta": q["correta"],
+                        "explicacao": q["explicacao_referencia"]
                     }
                     st.write("")
 
@@ -311,14 +278,14 @@ with aba_quiz:
                     porcentagem = round((acertos / total) * 100, 1)
 
                     agora_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    conn = sqlite3.connect(DB_FILE)
-                    c = conn.cursor()
-                    c.execute('''
-                        INSERT INTO ranking (nome_aluno, tema, acertos, total, porcentagem, data_hora)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (nome_aluno.strip().title(), tema_selecionado, acertos, total, porcentagem, agora_iso))
-                    conn.commit()
-                    conn.close()
+                    supabase.table("ranking").insert({
+                        "nome_aluno": nome_aluno.strip().title(),
+                        "tema": tema_selecionado,
+                        "acertos": acertos,
+                        "total": total,
+                        "porcentagem": porcentagem,
+                        "data_hora": agora_iso
+                    }).execute()
 
                     st.toast("Estudo salvo com sucesso!", icon="📖")
                     st.divider()
@@ -330,14 +297,13 @@ with aba_quiz:
 
                     st.subheader("📋 Gabarito e Escrituras de Referência")
                     for idx, q in enumerate(questoes, 1):
-                        q_id, capitulo, enunciado, _, correta, explicacao = q
-                        resp = respostas_usuario[q_id]
+                        resp = respostas_usuario[q["id"]]
                         acertou = resp["escolha"] == resp["correta"]
                         icone = "✅" if acertou else "❌"
 
-                        with st.expander(f"{icone} Pergunta {idx:02d} — Gabarito: {correta} (Sua resposta: {resp['escolha']})"):
-                            st.write(f"**Pergunta:** {enunciado}")
-                            st.info(f"**Referência & Reflexão:** {explicacao}")
+                        with st.expander(f"{icone} Pergunta {idx:02d} — Gabarito: {resp['correta']} (Sua resposta: {resp['escolha']})"):
+                            st.write(f"**Pergunta:** {q['enunciado']}")
+                            st.info(f"**Referência & Reflexão:** {resp['explicacao']}")
 
 # =======================================================
 # ABA 3: QUADRO DE DESTAQUE (MENSAL, GRÁFICOS E GERAL)
@@ -351,14 +317,11 @@ with aba_ranking:
     prefixo_mes = f"{ano_atual}-{mes_atual}"
     nome_mes_extenso = agora.strftime("%B").capitalize()
 
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT id, nome_aluno, tema, acertos, total, porcentagem, data_hora FROM ranking")
-    todos_registros = c.fetchall()
-    conn.close()
+    res_ranking = supabase.table("ranking").select("*").execute()
+    todos_registros = res_ranking.data
 
     if not todos_registros:
-        st.info("Ainda não há participações registradas. O ranking aparecerá aqui assim que os primeiros estudos forem realizados.")
+        st.info("Ainda não há participações registradas no banco de dados.")
     else:
         semanas_registradas_no_mes = set()
         dados_mes = {}
@@ -366,7 +329,10 @@ with aba_ranking:
         participacao_semanal = {}
 
         for reg in todos_registros:
-            _, nome, tema, acertos, total, porcentagem, data_h = reg
+            nome = reg["nome_aluno"]
+            acertos = reg["acertos"]
+            porcentagem = float(reg["porcentagem"])
+            data_h = reg["data_hora"]
             
             dt_obj = None
             for fmt in ("%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M"):
@@ -410,7 +376,6 @@ with aba_ranking:
             lista_geral.append((f"{n}{selo}", d["estudos"], d["acertos"], media))
         lista_geral.sort(key=lambda x: (x[3], x[2]), reverse=True)
 
-        # 1. Constância
         st.markdown(f"#### 📅 Desempenho do Mês ({nome_mes_extenso} / {ano_atual})")
         if alunos_todas_semanas:
             nomes_constantes = ", ".join([f"**{a}**" for a in alunos_todas_semanas])
@@ -421,7 +386,6 @@ with aba_ranking:
                 </div>
             """, unsafe_allow_html=True)
 
-        # 2. Pódio do Mês
         if dados_mes:
             lista_mes = []
             for n, d in dados_mes.items():
@@ -461,7 +425,6 @@ with aba_ranking:
                         </div>
                     """, unsafe_allow_html=True)
 
-        # 3. Gráficos de Engajamento
         st.write("")
         st.markdown("#### 📊 Gráficos de Engajamento da Ala")
         col_g1, col_g2 = st.columns(2)
@@ -475,17 +438,13 @@ with aba_ranking:
 
         with col_g2:
             st.caption("📚 **Estudos Realizados por Livro / Tema**")
-            conn = sqlite3.connect(DB_FILE)
-            c = conn.cursor()
-            c.execute("SELECT tema, COUNT(id) FROM ranking GROUP BY tema")
-            dados_temas = dict(c.fetchall())
-            conn.close()
-            if dados_temas:
-                st.bar_chart(dados_temas)
-            else:
-                st.info("Aguardando mais estudos para gerar o gráfico de temas.")
+            temas_contador = {}
+            for reg in todos_registros:
+                t = reg["tema"]
+                temas_contador[t] = temas_contador.get(t, 0) + 1
+            if temas_contador:
+                st.bar_chart(temas_contador)
 
-        # 4. Tabela Geral
         st.divider()
         st.markdown("#### 🌟 Classificação Geral Acumulada")
         tabela = []
@@ -500,7 +459,7 @@ with aba_ranking:
         st.dataframe(tabela, use_container_width=True, hide_index=True)
 
 # =======================================================
-# ABA 4: ÁREA DO PROFESSOR (CADASTRO, IA E GERENCIAMENTO)
+# ABA 4: ÁREA DO PROFESSOR (COM SUPABASE)
 # =======================================================
 with aba_professor:
     st.subheader("Painel do Professor e Liderança")
@@ -535,7 +494,7 @@ with aba_professor:
         # SUB-ABA 1: IMPORTAR
         with sub_tab1:
             st.markdown("#### Importar Questionário Pronto")
-            st.write("Envie um PDF ou cole um texto com perguntas e respostas já prontas. A IA estrutura e salva no banco.")
+            st.write("Envie um PDF ou cole um texto com perguntas prontas. A IA estrutura e salva no banco permanente.")
 
             tema_import = st.text_input("Livro / Tema:", placeholder="Ex: Livro de Mórmon ou Vem, e Segue-Me", key="imp_tema")
             cap_import = st.text_input("Capítulo / Lição:", placeholder="Ex: Alma 32 ou Lição 14", key="imp_cap")
@@ -553,7 +512,7 @@ with aba_professor:
                     except Exception as e:
                         st.error(f"Erro ao ler PDF: {e}")
             else:
-                conteudo_texto = st.text_area("Cole aqui as perguntas com alternativas e gabarito:", height=200, placeholder="1. Pergunta...\nA) Opção\nB) Opção\nGabarito: A\nRef: Escritura...")
+                conteudo_texto = st.text_area("Cole aqui as perguntas com alternativas e gabarito:", height=200)
 
             btn_importar = st.button("Processar e Salvar Questões Prontas", use_container_width=True)
 
@@ -569,46 +528,48 @@ with aba_professor:
                         client = genai.Client(api_key=chave_api)
                         
                         prompt_parser = (
-                            "Você é um assistente de banco de dados. O usuário forneceu perguntas e respostas prontas. "
-                            "Sua tarefa é extrair cada questão separando: enunciado, opções (A, B, C, D), alternativa correta e explicação/referência. "
-                            "Retorne ESTRITAMENTE um array JSON puro sem marcadores markdown ```json no formato:\n"
+                            "Você é um assistente de banco de dados. Extraia cada questão com enunciado, opções (A, B, C, D), "
+                            "correta e explicacao. Retorne ESTRITAMENTE um array JSON puro:\n"
                             '[{"enunciado": "...", "opcoes": {"A": "...", "B": "...", "C": "...", "D": "..."}, "correta": "A", "explicacao": "..."}]'
                         )
 
-                        with st.spinner("Processando e estruturando as questões..."):
-                            resp = client.models.generate_content(
-                                model="gemini-3.6-flash",
-                                contents=[prompt_parser, conteudo_texto]
-                            )
+                        with st.spinner("Processando e gravando no Supabase..."):
+                            resp = None
+                            for tentativa in range(3):
+                                try:
+                                    resp = client.models.generate_content(
+                                        model="gemini-3.6-flash",
+                                        contents=[prompt_parser, conteudo_texto]
+                                    )
+                                    break
+                                except Exception as erro_api:
+                                    if "503" in str(erro_api) and tentativa < 2:
+                                        time.sleep(2)
+                                        continue
+                                    raise erro_api
+
                             texto_limpo = resp.text.replace("```json", "").replace("```", "").strip()
                             questoes_extraidas = json.loads(texto_limpo)
 
-                            conn = sqlite3.connect(DB_FILE)
-                            c = conn.cursor()
                             for q in questoes_extraidas:
-                                c.execute('''
-                                    INSERT INTO questoes (livro_tema, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia)
-                                    VALUES (?, ?, ?, ?, ?, ?)
-                                ''', (
-                                    tema_import.strip(),
-                                    cap_import.strip() if cap_import else "Geral",
-                                    q["enunciado"],
-                                    json.dumps(q["opcoes"]),
-                                    q["correta"].upper().strip(),
-                                    q.get("explicacao", "")
-                                ))
-                            conn.commit()
-                            conn.close()
+                                supabase.table("questoes").insert({
+                                    "livro_tema": tema_import.strip(),
+                                    "capitulo_licao": cap_import.strip() if cap_import else "Geral",
+                                    "enunciado": q["enunciado"],
+                                    "opcoes_json": q["opcoes"],
+                                    "correta": q["correta"].upper().strip(),
+                                    "explicacao_referencia": q.get("explicacao", "")
+                                }).execute()
 
-                            st.success(f"✅ {len(questoes_extraidas)} questões importadas com sucesso!")
+                            st.success(f"✅ {len(questoes_extraidas)} questões gravadas com sucesso no Supabase!")
                             st.rerun()
                     except Exception as err:
                         st.error(f"Erro ao processar: {err}")
 
-        # SUB-ABA 2: GERADOR IA
+        # SUB-ABA 2: GERADOR COM IA
         with sub_tab2:
             st.markdown("#### Gerar Perguntas Inéditas de um Manual/PDF")
-            st.write("Envie o PDF da lição e o Gemini criará novas perguntas de múltipla escolha.")
+            st.write("Envie o PDF da lição e o Gemini criará novas perguntas salvas direto na nuvem.")
 
             tema_ia = st.text_input("Tema / Livro:", placeholder="Ex: Doutrina e Convênios", key="ia_tema")
             cap_ia = st.text_input("Capítulo / Lição:", placeholder="Ex: Seções 20 a 22", key="ia_cap")
@@ -636,49 +597,50 @@ with aba_professor:
 
                         client = genai.Client(api_key=chave_api)
                         prompt_instrucao = (
-                            f"Você é um professor de Escola Dominical de A Igreja de Jesus Cristo dos Santos dos Últimos Dias. "
-                            f"Com base no texto fornecido, crie exatamente {qtd_questoes} perguntas edificantes de múltipla escolha "
-                            f"com 4 opções (A, B, C, D), indicando a correta e a referência nas escrituras. "
-                            f"Retorne ESTRITAMENTE um JSON puro sem marcadores markdown ```json no formato:\n"
+                            f"Você é um professor da Escola Dominical de A Igreja de Jesus Cristo dos Santos dos Últimos Dias. "
+                            f"Crie exatamente {qtd_questoes} perguntas edificantes de múltipla escolha com 4 opções (A, B, C, D), "
+                            f"correta e referência nas escrituras. Retorne ESTRITAMENTE um array JSON puro:\n"
                             '[{"enunciado": "...", "opcoes": {"A": "...", "B": "...", "C": "...", "D": "..."}, "correta": "A", "explicacao": "..."}]'
                         )
 
-                        with st.spinner("O Gemini está lendo o manual e gerando perguntas..."):
-                            if len(texto_manual.strip()) > 80:
-                                resposta = client.models.generate_content(
-                                    model="gemini-3.6-flash",
-                                    contents=[prompt_instrucao, texto_manual]
-                                )
-                            else:
-                                arquivo_manual.seek(0)
-                                pdf_bytes = arquivo_manual.read()
-                                resposta = client.models.generate_content(
-                                    model="gemini-3.6-flash",
-                                    contents=[
-                                        types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
-                                        prompt_instrucao
-                                    ]
-                                )
+                        with st.spinner("Gerando questões e salvando no Supabase..."):
+                            resposta = None
+                            for tentativa in range(3):
+                                try:
+                                    if len(texto_manual.strip()) > 80:
+                                        resposta = client.models.generate_content(
+                                            model="gemini-3.6-flash",
+                                            contents=[prompt_instrucao, texto_manual]
+                                        )
+                                    else:
+                                        arquivo_manual.seek(0)
+                                        pdf_bytes = arquivo_manual.read()
+                                        resposta = client.models.generate_content(
+                                            model="gemini-3.6-flash",
+                                            contents=[
+                                                types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+                                                prompt_instrucao
+                                            ]
+                                        )
+                                    break
+                                except Exception as erro_api:
+                                    if "503" in str(erro_api) and tentativa < 2:
+                                        time.sleep(2)
+                                        continue
+                                    raise erro_api
 
                             texto_limpo = resposta.text.replace("```json", "").replace("```", "").strip()
                             perguntas_novas = json.loads(texto_limpo)
 
-                            conn = sqlite3.connect(DB_FILE)
-                            c = conn.cursor()
                             for item in perguntas_novas:
-                                c.execute('''
-                                    INSERT INTO questoes (livro_tema, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia)
-                                    VALUES (?, ?, ?, ?, ?, ?)
-                                ''', (
-                                    tema_ia if tema_ia else "Escola Dominical",
-                                    cap_ia if cap_ia else "Geral",
-                                    item["enunciado"],
-                                    json.dumps(item["opcoes"]),
-                                    item["correta"].upper().strip(),
-                                    item.get("explicacao", "")
-                                ))
-                            conn.commit()
-                            conn.close()
+                                supabase.table("questoes").insert({
+                                    "livro_tema": tema_ia if tema_ia else "Escola Dominical",
+                                    "capitulo_licao": cap_ia if cap_ia else "Geral",
+                                    "enunciado": item["enunciado"],
+                                    "opcoes_json": item["opcoes"],
+                                    "correta": item["correta"].upper().strip(),
+                                    "explicacao_referencia": item.get("explicacao", "")
+                                }).execute()
 
                             st.success(f"✅ {len(perguntas_novas)} perguntas geradas e salvas com sucesso!")
                             st.rerun()
@@ -702,19 +664,18 @@ with aba_professor:
                 correta_m = st.selectbox("Alternativa Correta:", ["A", "B", "C", "D"])
                 explic_m = st.text_area("Referência de Escritura / Explicação:")
                 
-                btn_salvar_manual = st.form_submit_button("Salvar Pergunta no Banco")
+                btn_salvar_manual = st.form_submit_button("Salvar Pergunta na Nuvem")
 
             if btn_salvar_manual:
                 if tema_m and enun_m and op_a and op_b and op_c and op_d:
-                    conn = sqlite3.connect(DB_FILE)
-                    c = conn.cursor()
-                    json_op = json.dumps({"A": op_a, "B": op_b, "C": op_c, "D": op_d})
-                    c.execute('''
-                        INSERT INTO questoes (livro_tema, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (tema_m.strip(), cap_m.strip(), enun_m.strip(), json_op, correta_m, explic_m.strip()))
-                    conn.commit()
-                    conn.close()
+                    supabase.table("questoes").insert({
+                        "livro_tema": tema_m.strip(),
+                        "capitulo_licao": cap_m.strip(),
+                        "enunciado": enun_m.strip(),
+                        "opcoes_json": {"A": op_a, "B": op_b, "C": op_c, "D": op_d},
+                        "correta": correta_m,
+                        "explicacao_referencia": explic_m.strip()
+                    }).execute()
                     st.success("Pergunta cadastrada com sucesso!")
                     st.rerun()
                 else:
@@ -722,57 +683,41 @@ with aba_professor:
 
         # SUB-ABA 4: GERENCIAR / EXCLUIR / ZERAR
         with sub_tab4:
-            st.markdown("#### ⚙️ Gerenciamento do Banco e Questões")
+            st.markdown("#### ⚙️ Gerenciamento do Banco (Supabase)")
             
             col_z1, col_z2 = st.columns(2)
             with col_z1:
                 st.markdown("**Limpeza de Participantes**")
-                st.caption("Zera o histórico de notas e o pódio, mantendo todas as perguntas salvas.")
+                st.caption("Zera o histórico de notas e o pódio mantendo as perguntas intactas.")
                 if st.button("🔄 Zerar Ranking / Participantes", type="secondary"):
-                    conn = sqlite3.connect(DB_FILE)
-                    c = conn.cursor()
-                    c.execute("DELETE FROM ranking")
-                    conn.commit()
-                    conn.close()
-                    st.toast("Participantes e notas zerados!", icon="🔄")
+                    supabase.table("ranking").delete().neq("id", 0).execute()
+                    st.toast("Ranking zerado no Supabase!", icon="🔄")
                     st.rerun()
 
             with col_z2:
                 st.markdown("**Limpeza de Questões**")
-                st.caption("Remove todas as perguntas do sistema de uma vez só.")
+                st.caption("Remove todas as perguntas do banco na nuvem.")
                 if st.button("🚨 Limpar Todas as Questões", type="primary"):
-                    conn = sqlite3.connect(DB_FILE)
-                    c = conn.cursor()
-                    c.execute("DELETE FROM questoes")
-                    conn.commit()
-                    conn.close()
-                    st.toast("Todas as questões foram removidas!", icon="🗑️")
+                    supabase.table("questoes").delete().neq("id", 0).execute()
+                    st.toast("Todas as questões foram apagadas!", icon="🗑️")
                     st.rerun()
 
             st.divider()
-            st.markdown("#### Lista Individual de Questões Cadastradas")
-
-            conn = sqlite3.connect(DB_FILE)
-            c = conn.cursor()
-            c.execute("SELECT id, livro_tema, capitulo_licao, enunciado FROM questoes ORDER BY id DESC")
-            todas_questoes = c.fetchall()
-            conn.close()
+            st.markdown("#### Lista de Questões no Banco")
+            res_all_q = supabase.table("questoes").select("id, livro_tema, capitulo_licao, enunciado").order("id", desc=True).execute()
+            todas_questoes = res_all_q.data
 
             if not todas_questoes:
-                st.info("Nenhuma questão cadastrada no banco de dados.")
+                st.info("Nenhuma questão cadastrada no momento.")
             else:
-                for q_id, q_tema, q_cap, q_enun in todas_questoes:
+                for item_q in todas_questoes:
                     col_texto, col_btn = st.columns([5, 1])
                     with col_texto:
-                        st.markdown(f"**[{q_tema} — {q_cap}]** (ID #{q_id})")
-                        st.caption(q_enun[:130] + "..." if len(q_enun) > 130 else q_enun)
+                        st.markdown(f"**[{item_q['livro_tema']} — {item_q['capitulo_licao']}]** (ID #{item_q['id']})")
+                        st.caption(item_q['enunciado'][:130] + "..." if len(item_q['enunciado']) > 130 else item_q['enunciado'])
                     with col_btn:
-                        if st.button("🗑️ Excluir", key=f"del_q_{q_id}"):
-                            conn = sqlite3.connect(DB_FILE)
-                            c = conn.cursor()
-                            c.execute("DELETE FROM questoes WHERE id = ?", (q_id,))
-                            conn.commit()
-                            conn.close()
-                            st.toast(f"Questão #{q_id} removida!", icon="🗑️")
+                        if st.button("🗑️ Excluir", key=f"del_q_{item_q['id']}"):
+                            supabase.table("questoes").delete().eq("id", item_q['id']).execute()
+                            st.toast(f"Questão #{item_q['id']} excluída!", icon="🗑️")
                             st.rerun()
                     st.divider()
