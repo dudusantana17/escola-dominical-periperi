@@ -660,4 +660,119 @@ with aba_professor:
                                     ]
                                 )
 
-                            texto_limpo = resposta.text.replace("
+                            texto_limpo = resposta.text.replace("```json", "").replace("```", "").strip()
+                            perguntas_novas = json.loads(texto_limpo)
+
+                            conn = sqlite3.connect(DB_FILE)
+                            c = conn.cursor()
+                            for item in perguntas_novas:
+                                c.execute('''
+                                    INSERT INTO questoes (livro_tema, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia)
+                                    VALUES (?, ?, ?, ?, ?, ?)
+                                ''', (
+                                    tema_ia if tema_ia else "Escola Dominical",
+                                    cap_ia if cap_ia else "Geral",
+                                    item["enunciado"],
+                                    json.dumps(item["opcoes"]),
+                                    item["correta"].upper().strip(),
+                                    item.get("explicacao", "")
+                                ))
+                            conn.commit()
+                            conn.close()
+
+                            st.success(f"✅ {len(perguntas_novas)} perguntas geradas e salvas com sucesso!")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao gerar com IA: {e}")
+
+        # SUB-ABA 3: MANUAL
+        with sub_tab3:
+            st.markdown("#### Inserir Pergunta Manualmente")
+            with st.form("form_manual_novo"):
+                tema_m = st.text_input("Livro / Tema:", placeholder="Ex: Livro de Mórmon")
+                cap_m = st.text_input("Lição ou Capítulo:", placeholder="Ex: Mosias 2")
+                enun_m = st.text_area("Enunciado da Questão:")
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    op_a = st.text_input("Alternativa A:")
+                    op_c = st.text_input("Alternativa C:")
+                with col_b:
+                    op_b = st.text_input("Alternativa B:")
+                    op_d = st.text_input("Alternativa D:")
+                correta_m = st.selectbox("Alternativa Correta:", ["A", "B", "C", "D"])
+                explic_m = st.text_area("Referência de Escritura / Explicação:")
+                
+                btn_salvar_manual = st.form_submit_button("Salvar Pergunta no Banco")
+
+            if btn_salvar_manual:
+                if tema_m and enun_m and op_a and op_b and op_c and op_d:
+                    conn = sqlite3.connect(DB_FILE)
+                    c = conn.cursor()
+                    json_op = json.dumps({"A": op_a, "B": op_b, "C": op_c, "D": op_d})
+                    c.execute('''
+                        INSERT INTO questoes (livro_tema, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ''', (tema_m.strip(), cap_m.strip(), enun_m.strip(), json_op, correta_m, explic_m.strip()))
+                    conn.commit()
+                    conn.close()
+                    st.success("Pergunta cadastrada com sucesso!")
+                    st.rerun()
+                else:
+                    st.error("Preencha todos os campos obrigatórios.")
+
+        # SUB-ABA 4: GERENCIAR / EXCLUIR / ZERAR
+        with sub_tab4:
+            st.markdown("#### ⚙️ Gerenciamento do Banco e Questões")
+            
+            col_z1, col_z2 = st.columns(2)
+            with col_z1:
+                st.markdown("**Limpeza de Participantes**")
+                st.caption("Zera o histórico de notas e o pódio, mantendo todas as perguntas salvas.")
+                if st.button("🔄 Zerar Ranking / Participantes", type="secondary"):
+                    conn = sqlite3.connect(DB_FILE)
+                    c = conn.cursor()
+                    c.execute("DELETE FROM ranking")
+                    conn.commit()
+                    conn.close()
+                    st.toast("Participantes e notas zerados!", icon="🔄")
+                    st.rerun()
+
+            with col_z2:
+                st.markdown("**Limpeza de Questões**")
+                st.caption("Remove todas as perguntas do sistema de uma vez só.")
+                if st.button("🚨 Limpar Todas as Questões", type="primary"):
+                    conn = sqlite3.connect(DB_FILE)
+                    c = conn.cursor()
+                    c.execute("DELETE FROM questoes")
+                    conn.commit()
+                    conn.close()
+                    st.toast("Todas as questões foram removidas!", icon="🗑️")
+                    st.rerun()
+
+            st.divider()
+            st.markdown("#### Lista Individual de Questões Cadastradas")
+
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            c.execute("SELECT id, livro_tema, capitulo_licao, enunciado FROM questoes ORDER BY id DESC")
+            todas_questoes = c.fetchall()
+            conn.close()
+
+            if not todas_questoes:
+                st.info("Nenhuma questão cadastrada no banco de dados.")
+            else:
+                for q_id, q_tema, q_cap, q_enun in todas_questoes:
+                    col_texto, col_btn = st.columns([5, 1])
+                    with col_texto:
+                        st.markdown(f"**[{q_tema} — {q_cap}]** (ID #{q_id})")
+                        st.caption(q_enun[:130] + "..." if len(q_enun) > 130 else q_enun)
+                    with col_btn:
+                        if st.button("🗑️ Excluir", key=f"del_q_{q_id}"):
+                            conn = sqlite3.connect(DB_FILE)
+                            c = conn.cursor()
+                            c.execute("DELETE FROM questoes WHERE id = ?", (q_id,))
+                            conn.commit()
+                            conn.close()
+                            st.toast(f"Questão #{q_id} removida!", icon="🗑️")
+                            st.rerun()
+                    st.divider()
