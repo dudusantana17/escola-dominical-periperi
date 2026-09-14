@@ -173,7 +173,7 @@ def normalizar_nome(nome: str) -> str:
 # =======================================================
 st.markdown("""
     <div class="church-header">
-        <div class="sub-sub">A Igreja de Jesus Cristo dos Santos dos Últimos Dias</div>
+        <div class="sub-sub"></div>
         <h1>Escola Dominical — Ala Periperi</h1>
         <p>“Aprendei de mim e ouvi minhas palavras; andai na mansidão de meu Espírito e tereis paz em mim.” — D&C 19:23</p>
     </div>
@@ -183,7 +183,7 @@ aba_home, aba_quiz, aba_ranking, aba_professor = st.tabs([
     "🏠 Início & Galeria",
     "📖 Estudo & Quiz",
     "🏆 Quadro de Destaque",
-    "🔐 Área do Professor"
+    "🔐 Área da Presidência"
 ])
 
 # =======================================================
@@ -207,7 +207,7 @@ with aba_home:
         ]
 
     st.divider()
-    st.markdown("### 📸 Momentos e Atividades da Ala")
+    st.markdown("### 📸 Vem e Segue-Me")
 
     if fotos:
         slides_html = ""
