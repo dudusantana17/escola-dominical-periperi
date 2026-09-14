@@ -167,7 +167,7 @@ supabase = get_supabase_client()
 # =======================================================
 st.markdown("""
     <div class="church-header">
-        
+        <div class="sub-sub"></div>
         <h1>Escola Dominical — Ala Periperi</h1>
         <p>“Aprendei de mim e ouvi minhas palavras; andai na mansidão de meu Espírito e tereis paz em mim.” — D&C 19:23</p>
     </div>
