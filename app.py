@@ -4,6 +4,7 @@ import json
 import os
 import time
 import base64
+import re
 from datetime import datetime
 from PIL import Image
 
@@ -153,7 +154,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =======================================================
-# 3. CONEXÃO COM O SUPABASE
+# 3. FUNÇÕES AUXILIARES E BANCO SUPABASE
 # =======================================================
 @st.cache_resource
 def get_supabase_client() -> Client:
@@ -163,25 +164,26 @@ def get_supabase_client() -> Client:
 
 supabase = get_supabase_client()
 
+def normalizar_nome(nome: str) -> str:
+    """Padroniza espaços duplos e capitalização do nome do membro."""
+    return re.sub(r'\s+', ' ', nome.strip()).title()
+
 # =======================================================
 # 4. CABEÇALHO HERO INSTITUCIONAL
 # =======================================================
 st.markdown("""
     <div class="church-header">
-        <div class="sub-sub"></div>
+        <div class="sub-sub">A Igreja de Jesus Cristo dos Santos dos Últimos Dias</div>
         <h1>Escola Dominical — Ala Periperi</h1>
         <p>“Aprendei de mim e ouvi minhas palavras; andai na mansidão de meu Espírito e tereis paz em mim.” — D&C 19:23</p>
     </div>
 """, unsafe_allow_html=True)
 
-# =======================================================
-# 5. CRIAÇÃO DAS ABAS PRINCIPAIS
-# =======================================================
 aba_home, aba_quiz, aba_ranking, aba_professor = st.tabs([
     "🏠 Início & Galeria",
     "📖 Estudo & Quiz",
     "🏆 Quadro de Destaque",
-    "🔐 Área da Presidência"
+    "🔐 Área do Professor"
 ])
 
 # =======================================================
@@ -197,10 +199,15 @@ with aba_home:
     pasta_assets = "assets"
     fotos = []
     if os.path.exists(pasta_assets):
-        fotos = [os.path.join(pasta_assets, f) for f in os.listdir(pasta_assets) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        extensoes_validas = ('.png', '.jpg', '.jpeg', '.webp')
+        fotos = [
+            os.path.join(pasta_assets, f) 
+            for f in os.listdir(pasta_assets) 
+            if f.lower().endswith(extensoes_validas) and not f.startswith('.') and f != "README.md"
+        ]
 
     st.divider()
-    st.markdown("### 📸 Vem e Segue-Me 2026")
+    st.markdown("### 📸 Momentos e Atividades da Ala")
 
     if fotos:
         slides_html = ""
@@ -210,7 +217,7 @@ with aba_home:
                 with open(fpath, "rb") as img_file:
                     b64_str = base64.b64encode(img_file.read()).decode()
                 ext = os.path.splitext(fpath)[1].replace(".", "").lower()
-                nome_legenda = os.path.splitext(os.path.basename(fpath))[0].replace("_", " ").title()
+                nome_legenda = os.path.splitext(os.path.basename(fpath))[0].replace("_", " ").replace("-", " ").title()
 
                 display_style = "block" if idx == 0 else "none"
                 slides_html += f"""
@@ -352,17 +359,35 @@ with aba_quiz:
     st.subheader("Caderno de Estudos e Perguntas")
     col1, col2 = st.columns(2)
 
+    # Identificar tema destaque definido pelo professor
+    tema_destaque = ""
+    try:
+        cfg = supabase.table("configuracoes").select("valor").eq("chave", "tema_destaque").execute()
+        if cfg.data:
+            tema_destaque = cfg.data[0]["valor"]
+    except Exception:
+        pass
+
     with col1:
-        nome_aluno = st.text_input("Seu Nome (ou Nome Completo):", placeholder="Ex: Irmão Souza / Taís")
+        nome_aluno_raw = st.text_input("Seu Nome e Sobrenome:", placeholder="Ex: Lucas Santana")
+        nome_aluno = normalizar_nome(nome_aluno_raw) if nome_aluno_raw else ""
 
     with col2:
         try:
             res_temas = supabase.table("questoes").select("livro_tema").execute()
-            temas_disponiveis = list(set([item["livro_tema"] for item in res_temas.data])) if res_temas.data else []
+            temas_disponiveis = sorted(list(set([item["livro_tema"] for item in res_temas.data]))) if res_temas.data else []
         except Exception:
             temas_disponiveis = []
-            
-        tema_selecionado = st.selectbox("Livro / Programa:", temas_disponiveis if temas_disponiveis else ["Nenhum tema cadastrado"])
+
+        idx_padrao = 0
+        if tema_destaque in temas_disponiveis:
+            idx_padrao = temas_disponiveis.index(tema_destaque)
+
+        tema_selecionado = st.selectbox(
+            "Lição / Tema:", 
+            temas_disponiveis if temas_disponiveis else ["Nenhum tema cadastrado"],
+            index=idx_padrao if temas_disponiveis else 0
+        )
 
     if not nome_aluno:
         st.info("👆 Por favor, preencha o seu nome acima para iniciar as perguntas.")
@@ -411,18 +436,34 @@ with aba_quiz:
                     acertos = sum(1 for v in respostas_usuario.values() if v["escolha"] == v["correta"])
                     total = len(questoes)
                     porcentagem = round((acertos / total) * 100, 1)
-
                     agora_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    supabase.table("ranking").insert({
-                        "nome_aluno": nome_aluno.strip().title(),
-                        "tema": tema_selecionado,
-                        "acertos": acertos,
-                        "total": total,
-                        "porcentagem": porcentagem,
-                        "data_hora": agora_iso
-                    }).execute()
 
-                    st.toast("Estudo salvo com sucesso!", icon="📖")
+                    # Verificação de Envio Único / Atualização pela Maior Nota
+                    res_anterior = supabase.table("ranking").select("id, acertos, porcentagem").eq("nome_aluno", nome_aluno).eq("tema", tema_selecionado).execute()
+                    
+                    if res_anterior.data:
+                        reg_antigo = res_anterior.data[0]
+                        if porcentagem > float(reg_antigo["porcentagem"]):
+                            supabase.table("ranking").update({
+                                "acertos": acertos,
+                                "total": total,
+                                "porcentagem": porcentagem,
+                                "data_hora": agora_iso
+                            }).eq("id", reg_antigo["id"]).execute()
+                            st.toast("Parabéns! Sua nota mais alta foi atualizada.", icon="📈")
+                        else:
+                            st.toast("Participação já computada! Sua nota anterior prevaleceu.", icon="ℹ️")
+                    else:
+                        supabase.table("ranking").insert({
+                            "nome_aluno": nome_aluno,
+                            "tema": tema_selecionado,
+                            "acertos": acertos,
+                            "total": total,
+                            "porcentagem": porcentagem,
+                            "data_hora": agora_iso
+                        }).execute()
+                        st.toast("Estudo salvo com sucesso!", icon="📖")
+
                     st.divider()
                     st.subheader("📊 Seu Desempenho")
                     m1, m2, m3 = st.columns(3)
@@ -594,7 +635,7 @@ with aba_ranking:
         st.dataframe(tabela, use_container_width=True, hide_index=True)
 
 # =======================================================
-# ABA 4: ÁREA DO PROFESSOR (COM SUPABASE)
+# ABA 4: ÁREA DO PROFESSOR
 # =======================================================
 with aba_professor:
     st.subheader("Painel do Professor e Liderança")
@@ -619,6 +660,26 @@ with aba_professor:
             st.session_state.admin_logado = False
             st.rerun()
 
+        # Definição do Tema da Semana
+        st.markdown("### 📌 Lição Ativa da Semana")
+        try:
+            res_t = supabase.table("questoes").select("livro_tema").execute()
+            todos_temas = sorted(list(set([it["livro_tema"] for it in res_t.data]))) if res_t.data else []
+        except Exception:
+            todos_temas = []
+
+        if todos_temas:
+            col_t1, col_t2 = st.columns([3, 1])
+            with col_t1:
+                novo_destaque = st.selectbox("Escolha a lição que abrirá selecionada para os alunos:", todos_temas)
+            with col_t2:
+                st.write("")
+                st.write("")
+                if st.button("Fixar Lição da Semana", use_container_width=True):
+                    supabase.table("configuracoes").upsert({"chave": "tema_destaque", "valor": novo_destaque}).execute()
+                    st.toast("Lição da semana atualizada com sucesso!", icon="📌")
+        st.divider()
+
         sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs([
             "📋 Importar Questões Prontas",
             "⚡ Gerar com IA (Manual/PDF)",
@@ -629,15 +690,13 @@ with aba_professor:
         # SUB-ABA 1: IMPORTAR
         with sub_tab1:
             st.markdown("#### Importar Questionário Pronto")
-            st.write("Envie um PDF ou cole um texto com perguntas prontas. A IA estrutura e salva no banco permanente.")
-
-            tema_import = st.text_input("Livro / Tema:", placeholder="Ex: Livro de Mórmon ou Vem, e Segue-Me", key="imp_tema")
-            cap_import = st.text_input("Capítulo / Lição:", placeholder="Ex: Alma 32 ou Lição 14", key="imp_cap")
+            tema_import = st.text_input("Livro / Tema:", placeholder="Ex: Isaías 1-12", key="imp_tema")
+            cap_import = st.text_input("Capítulo / Lição:", placeholder="Ex: Vem, e Segue-Me", key="imp_cap")
             origem_import = st.radio("Origem das questões:", ["📄 Upload de PDF", "📝 Colar Texto"], horizontal=True)
             
             conteudo_texto = ""
             if origem_import == "📄 Upload de PDF":
-                pdf_questoes = st.file_uploader("Selecione o PDF contendo as perguntas:", type=["pdf"], key="pdf_pronto")
+                pdf_questoes = st.file_uploader("Selecione o PDF com as perguntas:", type=["pdf"], key="pdf_pronto")
                 if pdf_questoes:
                     try:
                         import pypdf
@@ -647,42 +706,28 @@ with aba_professor:
                     except Exception as e:
                         st.error(f"Erro ao ler PDF: {e}")
             else:
-                conteudo_texto = st.text_area("Cole aqui as perguntas com alternativas e gabarito:", height=200)
+                conteudo_texto = st.text_area("Cole as perguntas com opções e gabarito:", height=200)
 
-            btn_importar = st.button("Processar e Salvar Questões Prontas", use_container_width=True)
-
-            if btn_importar:
+            if st.button("Processar e Salvar Questões Prontas", use_container_width=True):
                 chave_api = st.secrets.get("GEMINI_API_KEY", "")
                 if not chave_api:
                     st.error("Chave GEMINI_API_KEY ausente nos Secrets!")
                 elif not tema_import or not conteudo_texto.strip():
-                    st.warning("Preencha o Tema e informe o texto ou PDF com as questões.")
+                    st.warning("Preencha o Tema e forneça o conteúdo.")
                 else:
                     try:
                         from google import genai
                         client = genai.Client(api_key=chave_api)
-                        
                         prompt_parser = (
                             "Você é um assistente de banco de dados. Extraia cada questão com enunciado, opções (A, B, C, D), "
                             "correta e explicacao. Retorne ESTRITAMENTE um array JSON puro:\n"
                             '[{"enunciado": "...", "opcoes": {"A": "...", "B": "...", "C": "...", "D": "..."}, "correta": "A", "explicacao": "..."}]'
                         )
-
                         with st.spinner("Processando e gravando no Supabase..."):
-                            resp = None
-                            for tentativa in range(3):
-                                try:
-                                    resp = client.models.generate_content(
-                                        model="gemini-2.5-flash",
-                                        contents=[prompt_parser, conteudo_texto]
-                                    )
-                                    break
-                                except Exception as erro_api:
-                                    if "503" in str(erro_api) and tentativa < 2:
-                                        time.sleep(2)
-                                        continue
-                                    raise erro_api
-
+                            resp = client.models.generate_content(
+                                model="gemini-2.5-flash",
+                                contents=[prompt_parser, conteudo_texto]
+                            )
                             texto_limpo = resp.text.replace("```json", "").replace("```", "").strip()
                             questoes_extraidas = json.loads(texto_limpo)
 
@@ -696,7 +741,7 @@ with aba_professor:
                                     "explicacao_referencia": q.get("explicacao", "")
                                 }).execute()
 
-                            st.success(f"✅ {len(questoes_extraidas)} questões gravadas com sucesso no Supabase!")
+                            st.success(f"✅ {len(questoes_extraidas)} questões gravadas com sucesso!")
                             st.rerun()
                     except Exception as err:
                         st.error(f"Erro ao processar: {err}")
@@ -704,21 +749,17 @@ with aba_professor:
         # SUB-ABA 2: GERADOR COM IA
         with sub_tab2:
             st.markdown("#### Gerar Perguntas Inéditas de um Manual/PDF")
-            st.write("Envie o PDF da lição e o Gemini criará novas perguntas salvas direto na nuvem.")
+            tema_ia = st.text_input("Tema / Livro:", placeholder="Ex: Isaías 1-12", key="ia_tema")
+            cap_ia = st.text_input("Capítulo / Lição:", placeholder="Ex: Deus é a minha salvação", key="ia_cap")
+            qtd_questoes = st.slider("Quantidade de perguntas:", min_value=1, max_value=8, value=4)
+            arquivo_manual = st.file_uploader("Upload do Manual (PDF):", type=["pdf"], key="pdf_manual")
 
-            tema_ia = st.text_input("Tema / Livro:", placeholder="Ex: Doutrina e Convênios", key="ia_tema")
-            cap_ia = st.text_input("Capítulo / Lição:", placeholder="Ex: Seções 20 a 22", key="ia_cap")
-            qtd_questoes = st.slider("Quantidade de perguntas:", min_value=1, max_value=8, value=3)
-            arquivo_manual = st.file_uploader("Upload do Manual / Texto (PDF):", type=["pdf"], key="pdf_manual")
-
-            btn_gerar_ia = st.button("⚡ Gerar Perguntas com Gemini", use_container_width=True)
-
-            if btn_gerar_ia:
+            if st.button("⚡ Gerar Perguntas com Gemini", use_container_width=True):
                 chave_api = st.secrets.get("GEMINI_API_KEY", "")
                 if not chave_api:
                     st.error("Chave GEMINI_API_KEY ausente nos Secrets!")
                 elif not arquivo_manual:
-                    st.warning("Selecione o arquivo PDF do manual.")
+                    st.warning("Selecione o arquivo PDF.")
                 else:
                     try:
                         from google import genai
@@ -739,30 +780,21 @@ with aba_professor:
                         )
 
                         with st.spinner("Gerando questões e salvando no Supabase..."):
-                            resposta = None
-                            for tentativa in range(3):
-                                try:
-                                    if len(texto_manual.strip()) > 80:
-                                        resposta = client.models.generate_content(
-                                            model="gemini-2.5-flash",
-                                            contents=[prompt_instrucao, texto_manual]
-                                        )
-                                    else:
-                                        arquivo_manual.seek(0)
-                                        pdf_bytes = arquivo_manual.read()
-                                        resposta = client.models.generate_content(
-                                            model="gemini-2.5-flash",
-                                            contents=[
-                                                types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
-                                                prompt_instrucao
-                                            ]
-                                        )
-                                    break
-                                except Exception as erro_api:
-                                    if "503" in str(erro_api) and tentativa < 2:
-                                        time.sleep(2)
-                                        continue
-                                    raise erro_api
+                            if len(texto_manual.strip()) > 80:
+                                resposta = client.models.generate_content(
+                                    model="gemini-2.5-flash",
+                                    contents=[prompt_instrucao, texto_manual]
+                                )
+                            else:
+                                arquivo_manual.seek(0)
+                                pdf_bytes = arquivo_manual.read()
+                                resposta = client.models.generate_content(
+                                    model="gemini-2.5-flash",
+                                    contents=[
+                                        types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+                                        prompt_instrucao
+                                    ]
+                                )
 
                             texto_limpo = resposta.text.replace("```json", "").replace("```", "").strip()
                             perguntas_novas = json.loads(texto_limpo)
@@ -777,17 +809,17 @@ with aba_professor:
                                     "explicacao_referencia": item.get("explicacao", "")
                                 }).execute()
 
-                            st.success(f"✅ {len(perguntas_novas)} perguntas geradas e salvas com sucesso!")
+                            st.success(f"✅ {len(perguntas_novas)} perguntas geradas com sucesso!")
                             st.rerun()
                     except Exception as e:
-                        st.error(f"Erro ao gerar com IA: {e}")
+                        st.error(f"Erro ao gerar: {e}")
 
         # SUB-ABA 3: MANUAL
         with sub_tab3:
             st.markdown("#### Inserir Pergunta Manualmente")
             with st.form("form_manual_novo"):
                 tema_m = st.text_input("Livro / Tema:", placeholder="Ex: Livro de Mórmon")
-                cap_m = st.text_input("Lição ou Capítulo:", placeholder="Ex: Mosias 2")
+                cap_m = st.text_input("Lição ou Capítulo:", placeholder="Ex: 2 Néfi 2")
                 enun_m = st.text_area("Enunciado da Questão:")
                 col_a, col_b = st.columns(2)
                 with col_a:
@@ -816,34 +848,28 @@ with aba_professor:
                 else:
                     st.error("Preencha todos os campos obrigatórios.")
 
-        # SUB-ABA 4: GERENCIAR / EXCLUIR / ZERAR
+        # SUB-ABA 4: GERENCIAR
         with sub_tab4:
             st.markdown("#### ⚙️ Gerenciamento do Banco (Supabase)")
-            
             col_z1, col_z2 = st.columns(2)
             with col_z1:
-                st.markdown("**Limpeza de Participantes**")
-                st.caption("Zera o histórico de notas e o pódio mantendo as perguntas intactas.")
                 if st.button("🔄 Zerar Ranking / Participantes", type="secondary"):
                     supabase.table("ranking").delete().neq("id", 0).execute()
-                    st.toast("Ranking zerado no Supabase!", icon="🔄")
+                    st.toast("Ranking zerado!", icon="🔄")
                     st.rerun()
-
             with col_z2:
-                st.markdown("**Limpeza de Questões**")
-                st.caption("Remove todas as perguntas do banco na nuvem.")
                 if st.button("🚨 Limpar Todas as Questões", type="primary"):
                     supabase.table("questoes").delete().neq("id", 0).execute()
                     st.toast("Todas as questões foram apagadas!", icon="🗑️")
                     st.rerun()
 
             st.divider()
-            st.markdown("#### Lista de Questões no Banco")
+            st.markdown("#### Questões Cadastradas")
             res_all_q = supabase.table("questoes").select("id, livro_tema, capitulo_licao, enunciado").order("id", desc=True).execute()
             todas_questoes = res_all_q.data
 
             if not todas_questoes:
-                st.info("Nenhuma questão cadastrada no momento.")
+                st.info("Nenhuma questão cadastrada.")
             else:
                 for item_q in todas_questoes:
                     col_texto, col_btn = st.columns([5, 1])
