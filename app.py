@@ -160,7 +160,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =======================================================
-# 3. BANCO DE DADOS (SQLite Local)
+# 3. BANCO DE DADOS (SQLite Local - Sem inserções automáticas)
 # =======================================================
 DB_FILE = "escola_dominical_periperi.db"
 
@@ -189,68 +189,6 @@ def init_db():
             data_hora TEXT
         )
     ''')
-
-    c.execute("SELECT COUNT(*) FROM questoes")
-    if c.fetchone()[0] == 0:
-        questoes_iniciais = [
-            (
-                "Livro de Mórmon",
-                "1 Néfi 3",
-                "Qual foi a memorável resposta dada por Néfi quando seu pai, Leí, pediu para que ele retornasse a Jerusalém para buscar as placas de latão?",
-                json.dumps({
-                    "A": "Irei e farei as coisas que o Senhor ordenou, pois sei que Ele nunca dá ordens sem preparar um caminho.",
-                    "B": "Pedirei um sinal ao Senhor para saber se essa jornada é verdadeiramente necessária.",
-                    "C": "Iremos somente se nossos irmãos Lamã e Lemuel concordarem em liderar o caminho.",
-                    "D": "Esperaremos até que as tribulações no deserto diminuam antes de regressarmos."
-                }),
-                "A",
-                "1 Néfi 3:7 — “Eu irei e farei as coisas que o Senhor ordenou, porque sei que o Senhor nunca dá ordens aos filhos dos homens sem antes preparar um caminho para que possam cumprir o que lhes ordena.”"
-            ),
-            (
-                "Livro de Mórmon",
-                "Mosias 2",
-                "Ao discursar de sua torre para o povo, o que o Rei Benjamim ensinou a respeito do serviço ao próximo?",
-                json.dumps({
-                    "A": "Quem serve ao próximo adquire méritos para ser exaltado sem esforço pessoal.",
-                    "B": "Quando estais a serviço de vosso próximo, estais somente a serviço de vosso Deus.",
-                    "C": "O serviço é exigido apenas daqueles que possuem abundância de bens materiais.",
-                    "D": "Devemos servir unicamente aos que compartilham das nossas mesmas crenças."
-                }),
-                "B",
-                "Mosias 2:17 — “E eis que vos digo estas coisas para que aprendais sabedoria; para que saibais que, quando estais a serviço de vosso próximo, estais somente a serviço de vosso Deus.”"
-            ),
-            (
-                "Doutrina e Convênios",
-                "Seção 19",
-                "O que o Senhor nos ensina sobre o discipulado e a paz pessoal em Doutrina e Convênios 19:23?",
-                json.dumps({
-                    "A": "Buscai primeiro as riquezas do mundo para depois edificar a Sião.",
-                    "B": "Aprendei de mim e ouvi minhas palavras; andai na mansidão de meu Espírito e tereis paz em mim.",
-                    "C": "Não façais orações em segredo, mas proclamai vosso conhecimento publicamente.",
-                    "D": "O conhecimento secular precede os mandamentos espirituais."
-                }),
-                "B",
-                "D&C 19:23 — “Aprendei de mim e ouvi minhas palavras; andai na mansidão de meu Espírito e tereis paz em mim.”"
-            ),
-            (
-                "Vem, e Segue-Me",
-                "Princípios do Evangelho",
-                "De acordo com Tiago 1:5, o que devemos fazer se tivermos falta de sabedoria?",
-                json.dumps({
-                    "A": "Guardar a dúvida em segredo para não demonstrar fraqueza.",
-                    "B": "Pedir a Deus, que a todos dá liberalmente e nada censura, e ser-nos-á dada.",
-                    "C": "Aguardar anos até que surja uma resposta espontânea.",
-                    "D": "Consultar unicamente filosofias dos homens."
-                }),
-                "B",
-                "Tiago 1:5 — “E se algum de vós tem falta de sabedoria, peça-a a Deus, que a todos dá liberalmente e nada censura, e ser-lhe-á dada.” Essa passagem motivou Joseph Smith a orar no Bosque Sagrado."
-            )
-        ]
-        c.executemany('''
-            INSERT INTO questoes (livro_tema, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', questoes_iniciais)
-
     conn.commit()
     conn.close()
 
@@ -422,7 +360,6 @@ with aba_ranking:
     if not todos_registros:
         st.info("Ainda não há participações registradas. O ranking aparecerá aqui assim que os primeiros estudos forem realizados.")
     else:
-        # Agregação prévia de dados
         semanas_registradas_no_mes = set()
         dados_mes = {}
         dados_gerais = {}
@@ -459,7 +396,6 @@ with aba_ranking:
                 dados_mes[nome]["acertos"] += acertos
                 dados_mes[nome]["porcentagens"].append(porcentagem)
 
-        # Identificação de quem participou de todas as semanas do mês
         alunos_todas_semanas = []
         if semanas_registradas_no_mes:
             total_semanas = len(semanas_registradas_no_mes)
@@ -467,7 +403,6 @@ with aba_ranking:
                 if len(sems) == total_semanas:
                     alunos_todas_semanas.append(aluno)
 
-        # Montagem da lista_geral antes de qualquer uso
         lista_geral = []
         for n, d in dados_gerais.items():
             media = round(sum(d["porcentagens"]) / len(d["porcentagens"]), 1)
@@ -475,7 +410,7 @@ with aba_ranking:
             lista_geral.append((f"{n}{selo}", d["estudos"], d["acertos"], media))
         lista_geral.sort(key=lambda x: (x[3], x[2]), reverse=True)
 
-        # 1. Seção de Constância
+        # 1. Constância
         st.markdown(f"#### 📅 Desempenho do Mês ({nome_mes_extenso} / {ano_atual})")
         if alunos_todas_semanas:
             nomes_constantes = ", ".join([f"**{a}**" for a in alunos_todas_semanas])
@@ -526,7 +461,7 @@ with aba_ranking:
                         </div>
                     """, unsafe_allow_html=True)
 
-        # 3. Gráficos Visuais de Engajamento
+        # 3. Gráficos de Engajamento
         st.write("")
         st.markdown("#### 📊 Gráficos de Engajamento da Ala")
         col_g1, col_g2 = st.columns(2)
@@ -548,9 +483,9 @@ with aba_ranking:
             if dados_temas:
                 st.bar_chart(dados_temas)
             else:
-                st.info("Aguardando mais dados para gerar o gráfico de temas.")
+                st.info("Aguardando mais estudos para gerar o gráfico de temas.")
 
-        # 4. Tabela Geral Acumulada
+        # 4. Tabela Geral
         st.divider()
         st.markdown("#### 🌟 Classificação Geral Acumulada")
         tabela = []
@@ -725,139 +660,4 @@ with aba_professor:
                                     ]
                                 )
 
-                            texto_limpo = resposta.text.replace("```json", "").replace("```", "").strip()
-                            perguntas_novas = json.loads(texto_limpo)
-
-                            conn = sqlite3.connect(DB_FILE)
-                            c = conn.cursor()
-                            for item in perguntas_novas:
-                                c.execute('''
-                                    INSERT INTO questoes (livro_tema, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia)
-                                    VALUES (?, ?, ?, ?, ?, ?)
-                                ''', (
-                                    tema_ia if tema_ia else "Escola Dominical",
-                                    cap_ia if cap_ia else "Geral",
-                                    item["enunciado"],
-                                    json.dumps(item["opcoes"]),
-                                    item["correta"].upper().strip(),
-                                    item.get("explicacao", "")
-                                ))
-                            conn.commit()
-                            conn.close()
-
-                            st.success(f"✅ {len(perguntas_novas)} perguntas geradas e salvas com sucesso!")
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao gerar com IA: {e}")
-
-        # SUB-ABA 3: MANUAL
-        with sub_tab3:
-            st.markdown("#### Inserir Pergunta Manualmente")
-            with st.form("form_manual_novo"):
-                tema_m = st.text_input("Livro / Tema:", placeholder="Ex: Livro de Mórmon")
-                cap_m = st.text_input("Lição ou Capítulo:", placeholder="Ex: Mosias 2")
-                enun_m = st.text_area("Enunciado da Questão:")
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    op_a = st.text_input("Alternativa A:")
-                    op_c = st.text_input("Alternativa C:")
-                with col_b:
-                    op_b = st.text_input("Alternativa B:")
-                    op_d = st.text_input("Alternativa D:")
-                correta_m = st.selectbox("Alternativa Correta:", ["A", "B", "C", "D"])
-                explic_m = st.text_area("Referência de Escritura / Explicação:")
-                
-                btn_salvar_manual = st.form_submit_button("Salvar Pergunta no Banco")
-
-            if btn_salvar_manual:
-                if tema_m and enun_m and op_a and op_b and op_c and op_d:
-                    conn = sqlite3.connect(DB_FILE)
-                    c = conn.cursor()
-                    json_op = json.dumps({"A": op_a, "B": op_b, "C": op_c, "D": op_d})
-                    c.execute('''
-                        INSERT INTO questoes (livro_tema, capitulo_licao, enunciado, opcoes_json, correta, explicacao_referencia)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (tema_m.strip(), cap_m.strip(), enun_m.strip(), json_op, correta_m, explic_m.strip()))
-                    conn.commit()
-                    conn.close()
-                    st.success("Pergunta cadastrada com sucesso!")
-                    st.rerun()
-                else:
-                    st.error("Preencha todos os campos obrigatórios.")
-
-
-        # ----------------------------------------------------
-        # SUB-ABA 4: EXCLUIR / GERENCIAR QUESTÕES
-        # ----------------------------------------------------
-        with sub_tab4:
-            st.markdown("#### 🗑️ Limpeza Geral de Questões")
-            st.write("Use o botão abaixo para remover **todas as perguntas** cadastradas de uma só vez.")
-            
-            # Botão de exclusão em massa
-            if st.button("🚨 Limpar Todas as Questões do Banco", type="primary"):
-                conn = sqlite3.connect(DB_FILE)
-                c = conn.cursor()
-                c.execute("DELETE FROM questoes")  # Remove todas as perguntas
-                conn.commit()
-                conn.close()
-                st.toast("Todas as questões foram apagadas com sucesso!", icon="🗑️")
-                st.rerun()
-
-            st.divider()
-            st.markdown("#### Lista de Questões Cadastradas")
-            # (o restante do código continua...)
-        
-        
-        
-        # ----------------------------------------------------
-        # SUB-ABA 4: GERENCIAR E REMOVER
-        # ----------------------------------------------------
-        with sub_tab4:
-            st.markdown("#### 🔄 Reiniciar Ranking e Participantes")
-            st.write("Use este botão para apagar todos os registros de notas e zerar o pódio (as perguntas cadastradas NÃO serão apagadas).")
-            
-            # Botão com confirmação
-            if st.button("⚠️ Zerar Todos os Participantes do Ranking", type="primary"):
-                conn = sqlite3.connect(DB_FILE)
-                c = conn.cursor()
-                c.execute("DELETE FROM ranking")  # Esvazia a tabela de ranking
-                conn.commit()
-                conn.close()
-                st.toast("Ranking e participantes zerados com sucesso!", icon="🔄")
-                st.rerun()
-
-            st.divider()
-            st.markdown("#### Lista de Questões Cadastradas")
-            # (o restante do código de listar e excluir perguntas continua aqui...)
-        
-
-        
-        # SUB-ABA 4: EXCLUIR
-        with sub_tab4:
-            st.markdown("#### Lista de Questões Cadastradas")
-            st.write("Revise as perguntas presentes no sistema e remova qualquer item indesejado com um clique.")
-
-            conn = sqlite3.connect(DB_FILE)
-            c = conn.cursor()
-            c.execute("SELECT id, livro_tema, capitulo_licao, enunciado FROM questoes ORDER BY id DESC")
-            todas_questoes = c.fetchall()
-            conn.close()
-
-            if not todas_questoes:
-                st.info("Nenhuma questão cadastrada no banco de dados.")
-            else:
-                for q_id, q_tema, q_cap, q_enun in todas_questoes:
-                    col_texto, col_btn = st.columns([5, 1])
-                    with col_texto:
-                        st.markdown(f"**[{q_tema} — {q_cap}]** (ID #{q_id})")
-                        st.caption(q_enun[:130] + "..." if len(q_enun) > 130 else q_enun)
-                    with col_btn:
-                        if st.button("🗑️ Excluir", key=f"del_q_{q_id}"):
-                            conn = sqlite3.connect(DB_FILE)
-                            c = conn.cursor()
-                            c.execute("DELETE FROM questoes WHERE id = ?", (q_id,))
-                            conn.commit()
-                            conn.close()
-                            st.toast(f"Questão #{q_id} removida com sucesso!", icon="🗑️")
-                            st.rerun()
-                    st.divider()
+                            texto_limpo = resposta.text.replace("
