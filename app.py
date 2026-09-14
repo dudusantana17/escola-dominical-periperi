@@ -785,6 +785,29 @@ with aba_professor:
                 else:
                     st.error("Preencha todos os campos obrigatórios.")
 
+# ----------------------------------------------------
+        # SUB-ABA 4: GERENCIAR E REMOVER
+        # ----------------------------------------------------
+        with sub_tab4:
+            st.markdown("#### 🔄 Reiniciar Ranking e Participantes")
+            st.write("Use este botão para apagar todos os registros de notas e zerar o pódio (as perguntas cadastradas NÃO serão apagadas).")
+            
+            # Botão com confirmação
+            if st.button("⚠️ Zerar Todos os Participantes do Ranking", type="primary"):
+                conn = sqlite3.connect(DB_FILE)
+                c = conn.cursor()
+                c.execute("DELETE FROM ranking")  # Esvazia a tabela de ranking
+                conn.commit()
+                conn.close()
+                st.toast("Ranking e participantes zerados com sucesso!", icon="🔄")
+                st.rerun()
+
+            st.divider()
+            st.markdown("#### Lista de Questões Cadastradas")
+            # (o restante do código de listar e excluir perguntas continua aqui...)
+        
+
+        
         # SUB-ABA 4: EXCLUIR
         with sub_tab4:
             st.markdown("#### Lista de Questões Cadastradas")
