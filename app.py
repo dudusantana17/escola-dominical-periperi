@@ -785,7 +785,31 @@ with aba_professor:
                 else:
                     st.error("Preencha todos os campos obrigatórios.")
 
-# ----------------------------------------------------
+
+        # ----------------------------------------------------
+        # SUB-ABA 4: EXCLUIR / GERENCIAR QUESTÕES
+        # ----------------------------------------------------
+        with sub_tab4:
+            st.markdown("#### 🗑️ Limpeza Geral de Questões")
+            st.write("Use o botão abaixo para remover **todas as perguntas** cadastradas de uma só vez.")
+            
+            # Botão de exclusão em massa
+            if st.button("🚨 Limpar Todas as Questões do Banco", type="primary"):
+                conn = sqlite3.connect(DB_FILE)
+                c = conn.cursor()
+                c.execute("DELETE FROM questoes")  # Remove todas as perguntas
+                conn.commit()
+                conn.close()
+                st.toast("Todas as questões foram apagadas com sucesso!", icon="🗑️")
+                st.rerun()
+
+            st.divider()
+            st.markdown("#### Lista de Questões Cadastradas")
+            # (o restante do código continua...)
+        
+        
+        
+        # ----------------------------------------------------
         # SUB-ABA 4: GERENCIAR E REMOVER
         # ----------------------------------------------------
         with sub_tab4:
