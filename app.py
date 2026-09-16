@@ -725,7 +725,7 @@ with aba_professor:
                         )
                         with st.spinner("Processando e gravando no Supabase..."):
                             resp = client.models.generate_content(
-                                model="gemini-2.5-flash",
+                                model="gemini-3.6-flash",
                                 contents=[prompt_parser, conteudo_texto]
                             )
                             texto_limpo = resp.text.replace("```json", "").replace("```", "").strip()
@@ -782,14 +782,14 @@ with aba_professor:
                         with st.spinner("Gerando questões e salvando no Supabase..."):
                             if len(texto_manual.strip()) > 80:
                                 resposta = client.models.generate_content(
-                                    model="gemini-2.5-flash",
+                                    model="gemini-3.6-flash",
                                     contents=[prompt_instrucao, texto_manual]
                                 )
                             else:
                                 arquivo_manual.seek(0)
                                 pdf_bytes = arquivo_manual.read()
                                 resposta = client.models.generate_content(
-                                    model="gemini-2.5-flash",
+                                    model="gemini-3.6-flash",
                                     contents=[
                                         types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
                                         prompt_instrucao
