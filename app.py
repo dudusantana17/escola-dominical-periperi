@@ -18,8 +18,17 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Metatags para pré-visualização em redes sociais e WhatsApp
+st.markdown("""
+    <head>
+        <meta property="og:title" content="Escola Dominical — Ala Periperi" />
+        <meta property="og:description" content="Portal de estudos e questionários semanais do Vem, e Segue-Me." />
+        <meta property="og:type" content="website" />
+    </head>
+""", unsafe_allow_html=True)
+
 # =======================================================
-# 2. DESIGN VISUAL E CSS INSTITUCIONAL
+# 2. DESIGN VISUAL E CSS (MODO CLARO & MODO ESCURO)
 # =======================================================
 st.markdown("""
     <style>
@@ -27,17 +36,13 @@ st.markdown("""
 
     html, body, [class*="css"] {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        color: #1e293b;
     }
 
-    .stApp {
-        background-color: #f8fafc;
-    }
-
+    /* Cabeçalho Hero */
     .church-header {
         background: linear-gradient(135deg, #0b2545 0%, #133b68 60%, #1d4e89 100%);
         border-bottom: 3px solid #c5a059;
-        color: #ffffff;
+        color: #ffffff !important;
         padding: 32px 30px;
         border-radius: 14px;
         margin-bottom: 25px;
@@ -49,7 +54,7 @@ st.markdown("""
         letter-spacing: 2.5px;
         font-size: 11px;
         font-weight: 600;
-        color: #e2c275;
+        color: #e2c275 !important;
         margin-bottom: 8px;
     }
     .church-header h1 {
@@ -58,54 +63,69 @@ st.markdown("""
         font-weight: 700;
         letter-spacing: 0.5px;
         margin: 0;
-        color: #ffffff;
+        color: #ffffff !important;
     }
     .church-header p {
         font-size: 15px;
-        color: #e2e8f0;
+        color: #e2e8f0 !important;
         margin-top: 10px;
         font-style: italic;
     }
 
+    /* Card da Pergunta - Modo Claro (Padrão) */
     .quiz-card {
         background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-left: 5px solid #133b68;
+        border: 1px solid #cbd5e1;
+        border-left: 6px solid #133b68;
         border-radius: 12px;
         padding: 22px 24px;
         margin-bottom: 18px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        color: #0f172a !important;
     }
-    .quiz-title {
+    .quiz-card .quiz-title {
         font-weight: 700;
-        color: #0b2545;
-        font-size: 16px;
-        margin-bottom: 8px;
+        color: #0b2545 !important;
+        font-size: 17px;
+        margin-bottom: 10px;
+    }
+    .quiz-card .quiz-body {
+        font-size: 15px;
+        line-height: 1.6;
+        color: #1e293b !important;
     }
 
-    div[data-testid="stRadio"] > div { gap: 10px; }
+    /* Alternativas do Quiz (stRadio) - Modo Claro */
+    div[data-testid="stRadio"] > div {
+        gap: 12px;
+    }
     div[data-testid="stRadio"] label {
-        background: #ffffff !important;
-        border: 1px solid #cbd5e1 !important;
-        padding: 12px 18px !important;
+        background-color: #ffffff !important;
+        border: 1.5px solid #cbd5e1 !important;
+        padding: 14px 18px !important;
         border-radius: 10px !important;
         transition: all 0.2s ease !important;
         cursor: pointer;
         width: 100%;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+    }
+    div[data-testid="stRadio"] label p {
+        color: #0f172a !important;
+        font-size: 15px !important;
+        font-weight: 500 !important;
     }
     div[data-testid="stRadio"] label:hover {
-        background: #f1f5f9 !important;
+        background-color: #f1f5f9 !important;
         border-color: #133b68 !important;
         transform: translateX(4px);
     }
 
+    /* Botão Principal */
     .stButton > button {
         background: linear-gradient(135deg, #0b2545 0%, #133b68 100%) !important;
         color: #ffffff !important;
         font-weight: 600 !important;
         font-size: 16px !important;
-        letter-spacing: 0.3px !important;
         border-radius: 10px !important;
         padding: 0.75rem 2rem !important;
         border: 1px solid #c5a059 !important;
@@ -114,31 +134,23 @@ st.markdown("""
     }
     .stButton > button:hover {
         background: linear-gradient(135deg, #133b68 0%, #1d4e89 100%) !important;
-        box-shadow: 0 6px 20px rgba(11, 37, 69, 0.3) !important;
         color: #e2c275 !important;
         transform: translateY(-1px);
     }
 
-    [data-testid="stMetric"] {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-top: 3px solid #c5a059;
-        padding: 18px;
-        border-radius: 10px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
-    }
-
+    /* Pódio e Cards Informativos */
     .podio-card {
         background: #ffffff;
-        border: 1px solid #e2e8f0;
+        border: 1px solid #cbd5e1;
         border-radius: 12px;
         padding: 18px;
         text-align: center;
         box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+        color: #0f172a !important;
     }
     .podio-pos { font-size: 28px; margin-bottom: 4px; }
-    .podio-nome { font-weight: 700; font-size: 16px; color: #0b2545; }
-    .podio-media { font-size: 20px; font-weight: 700; color: #133b68; margin-top: 4px; }
+    .podio-nome { font-weight: 700; font-size: 16px; color: #0b2545 !important; }
+    .podio-media { font-size: 20px; font-weight: 700; color: #133b68 !important; margin-top: 4px; }
 
     .constancia-box {
         background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
@@ -147,14 +159,64 @@ st.markdown("""
         padding: 14px 20px;
         border-radius: 10px;
         margin: 15px 0;
-        color: #713f12;
+        color: #713f12 !important;
         font-weight: 500;
+    }
+
+    /* =======================================================
+       SUPORTE COMPLETO AO MODO ESCURO (DARK MODE)
+       ======================================================= */
+    @media (prefers-color-scheme: dark) {
+        .quiz-card {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            border-left: 6px solid #e2c275 !important;
+            color: #f8fafc !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+        }
+        .quiz-card .quiz-title {
+            color: #e2c275 !important;
+        }
+        .quiz-card .quiz-body {
+            color: #f1f5f9 !important;
+        }
+
+        div[data-testid="stRadio"] label {
+            background-color: #1e293b !important;
+            border: 1.5px solid #475569 !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+        }
+        div[data-testid="stRadio"] label p {
+            color: #f8fafc !important;
+        }
+        div[data-testid="stRadio"] label:hover {
+            background-color: #334155 !important;
+            border-color: #e2c275 !important;
+        }
+
+        .podio-card {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f8fafc !important;
+        }
+        .podio-nome {
+            color: #e2c275 !important;
+        }
+        .podio-media {
+            color: #38bdf8 !important;
+        }
+
+        .constancia-box {
+            background: linear-gradient(135deg, #422006 0%, #713f12 100%) !important;
+            border-color: #ca8a04 !important;
+            color: #fef08a !important;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
 
 # =======================================================
-# 3. FUNÇÕES AUXILIARES E BANCO SUPABASE
+# 3. CONEXÃO SUPABASE E UTILITÁRIOS
 # =======================================================
 @st.cache_resource
 def get_supabase_client() -> Client:
@@ -165,15 +227,15 @@ def get_supabase_client() -> Client:
 supabase = get_supabase_client()
 
 def normalizar_nome(nome: str) -> str:
-    """Padroniza espaços duplos e capitalização do nome do membro."""
+    """Remove múltiplos espaços e padroniza o nome com iniciais maiúsculas."""
     return re.sub(r'\s+', ' ', nome.strip()).title()
 
 # =======================================================
-# 4. CABEÇALHO HERO INSTITUCIONAL
+# 4. CABEÇALHO HERO
 # =======================================================
 st.markdown("""
     <div class="church-header">
-        <div class="sub-sub"></div>
+        <div class="sub-sub">A Igreja de Jesus Cristo dos Santos dos Últimos Dias</div>
         <h1>Escola Dominical — Ala Periperi</h1>
         <p>“Aprendei de mim e ouvi minhas palavras; andai na mansidão de meu Espírito e tereis paz em mim.” — D&C 19:23</p>
     </div>
@@ -183,7 +245,7 @@ aba_home, aba_quiz, aba_ranking, aba_professor = st.tabs([
     "🏠 Início & Galeria",
     "📖 Estudo & Quiz",
     "🏆 Quadro de Destaque",
-    "🔐 Área da Presidência"
+    "🔐 Área do Professor"
 ])
 
 # =======================================================
@@ -207,7 +269,7 @@ with aba_home:
         ]
 
     st.divider()
-    st.markdown("### 📸 Vem e Segue-Me")
+    st.markdown("### 📸 Momentos e Atividades da Ala")
 
     if fotos:
         slides_html = ""
@@ -369,7 +431,7 @@ with aba_quiz:
         pass
 
     with col1:
-        nome_aluno_raw = st.text_input("Seu Nome e Sobrenome:", placeholder="Ex: Lucas Santana")
+        nome_aluno_raw = st.text_input("Seu Nome e Sobrenome:", placeholder="Ex: Carlos Silva")
         nome_aluno = normalizar_nome(nome_aluno_raw) if nome_aluno_raw else ""
 
     with col2:
@@ -407,7 +469,7 @@ with aba_quiz:
                     st.markdown(f"""
                         <div class="quiz-card">
                             <div class="quiz-title">📖 Pergunta {idx:02d} — {q['capitulo_licao']}</div>
-                            <div style="font-size: 15px; line-height: 1.6;">{q['enunciado']}</div>
+                            <div class="quiz-body">{q['enunciado']}</div>
                         </div>
                     """, unsafe_allow_html=True)
 
@@ -749,8 +811,8 @@ with aba_professor:
         # SUB-ABA 2: GERADOR COM IA
         with sub_tab2:
             st.markdown("#### Gerar Perguntas Inéditas de um Manual/PDF")
-            tema_ia = st.text_input("Tema / Livro:", placeholder="Ex: Isaías 1-12", key="ia_tema")
-            cap_ia = st.text_input("Capítulo / Lição:", placeholder="Ex: Deus é a minha salvação", key="ia_cap")
+            tema_ia = st.text_input("Tema / Livro:", placeholder="Ex: Isaías 13-14", key="ia_tema")
+            cap_ia = st.text_input("Capítulo / Lição:", placeholder="Ex: Uma obra maravilhosa", key="ia_cap")
             qtd_questoes = st.slider("Quantidade de perguntas:", min_value=1, max_value=8, value=4)
             arquivo_manual = st.file_uploader("Upload do Manual (PDF):", type=["pdf"], key="pdf_manual")
 
