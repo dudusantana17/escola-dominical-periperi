@@ -1,6 +1,8 @@
 # 📖 Escola Dominical — Ala Periperi
 
-Sistema web interativo desenvolvido em Python com **Streamlit**, **SQLite** e inteligência artificial (**Google Gemini**) para o estudo semanal das escrituras e princípios do evangelho na Escola Dominical da **Ala Periperi**.
+Portal oficial de estudos e questionários **semanais do Vem, e Segue-Me** para a classe da Escola Dominical da Ala Periperi.
+Participe semanalmente e fortaleça seu aprendizado do evangelho!
+
 
 > *"Venham e Aprendam Comigo" (Mateus 11:28-30)*
 
